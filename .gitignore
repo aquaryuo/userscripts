@@ -1,0 +1,11 @@
+# excluded from this repo (kept local)
+_utils/
+.run/
+
+# never commit
+.env
+*.env
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
