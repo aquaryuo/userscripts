@@ -65,7 +65,8 @@ const theme = `
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap');
 
 * {
-  --accent: #5266a5;
+  /* Unified palette — sub.ryuo.to "OLED Black" (change --accent to re-brand) */
+  --accent: #3b82f6;
   /* */
   --tag-general: #9ab9ba;
   --tag-metadata: #c059c1;
@@ -73,11 +74,11 @@ const theme = `
   --tag-artist: #c387dd;
   --tag-copyright: #dd9887;
   /* */
-  --background: #101010;
-  --background-search: var(--background); /* #404040 */
+  --background: #000000;
+  --background-search: #17171b;
   --background-button: var(--background);
   /* */
-  --font-color: white;
+  --font-color: #f2f2f3;
   --link-color: var(--accent);
   --link-visited: #ddaf87;
   /* */

@@ -14,17 +14,17 @@ var theme = `
   font-family: 'Roboto', sans-serif;
   font-weight: 400;
   letter-spacing: 0.4px;
+  /* Unified palette — sub.ryuo.to "OLED Black" (RGB triplets; change --kt-accent to re-brand) */
+  --kt-background: 0, 0, 0;
+  --kt-background-sec: 12, 12, 14;
+  --kt-color: 242, 242, 243;
   /* */
-  --kt-background: 13, 13, 13;
-  --kt-background-sec: 32, 32, 32;
-  --kt-color: 255, 255, 255;
+  --kt-accent: 59, 130, 246;
+  --kt-inact-1: 200, 200, 205;
+  --kt-inact-2: 138, 138, 146;
   /* */
-  --kt-accent: 187, 162, 207;
-  --kt-inact-1: 206, 206, 206;
-  --kt-inact-2: 134, 134, 134;
-  /* */
-  --kt-fav: 66, 21, 92, 0.6;
-  --kt-fav-border: 104, 36, 143;
+  --kt-fav: 59, 130, 246, 0.16;
+  --kt-fav-border: 59, 130, 246;
   box-shadow: unset !important;
 }
 

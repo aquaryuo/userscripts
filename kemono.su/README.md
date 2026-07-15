@@ -6,24 +6,24 @@ post-content URL linkifier.
 
 ## Files
 
-| File        | Role                                                                          |
-| ----------- | ----------------------------------------------------------------------------- |
-| `module.js` | Userscript metadata + loader. **This is what you install** in Tampermonkey.   |
-| `script.js` | All behavior + the CSS theme, pulled in via `@require`.                        |
-| `_icons/`   | Image assets, mirrored at `https://nya.onish.dev/scr/kemono.su/_icons/`.       |
+| File              | Role                                                                        |
+| ----------------- | --------------------------------------------------------------------------- |
+| `kemono.user.js`  | Userscript metadata + loader. **This is what you install** in Tampermonkey. |
+| `script.js`       | All behavior + the CSS theme, pulled in via `@require`.                      |
+| `_icons/`         | Image assets, mirrored at `https://nya.onish.dev/scr/kemono.su/_icons/`.     |
 
-Both files are served from `https://nya.onish.dev/scr/kemono.su/`.
+Both files are served straight from GitHub raw (see the repo root README's DOWNLOAD button).
 
 ## Releasing
 
 `@require` is cached by Tampermonkey keyed on the URL, so a changed `script.js` only
 reaches installed clients when the loader itself updates. On every release, bump **both**:
 
-- `@version` in `module.js`
-- the `?v=` query on the `@require` line in `module.js` (keep it equal to `@version`)
+- `@version` in `kemono.user.js`
+- the `?v=` query on the `@require` line in `kemono.user.js` (keep it equal to `@version`)
 
-Then deploy both files. Tampermonkey's update check sees the new `@version`, re-fetches
-`module.js`, and the changed `?v=` forces a fresh `script.js`.
+Push to GitHub. Tampermonkey's update check sees the new `@version`, re-fetches
+`kemono.user.js`, and the changed `?v=` forces a fresh `script.js`.
 
 ## Settings / storage
 
