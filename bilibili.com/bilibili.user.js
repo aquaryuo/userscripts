@@ -1,11 +1,13 @@
 // ==UserScript==
 // @name         Bilibili Fixes
-// @version      0.1.0
+// @version      0.1.1
 // @description  Read the goddam name
 // @author       ryouzue
 // @match        https://*.bilibili.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=bilibili.com
-// @require      https://nya.onish.dev/scr/bilibili.com/dictionary.js
+// @updateURL    https://raw.githubusercontent.com/aquaryuo/userscripts/main/bilibili.com/bilibili.user.js
+// @downloadURL  https://raw.githubusercontent.com/aquaryuo/userscripts/main/bilibili.com/bilibili.user.js
+// @require      https://raw.githubusercontent.com/aquaryuo/userscripts/main/bilibili.com/dictionary.js?v=0.1.1
 // @grant        GM_addStyle
 // @run-at       document-start
 // ==/UserScript==
