@@ -79,6 +79,7 @@ const theme = `
   --background-button: var(--background);
   /* */
   --font-color: #f2f2f3;
+  --dim: #8a8a92;
   --link-color: var(--accent);
   --link-visited: #ddaf87;
   /* */
@@ -170,6 +171,7 @@ div.horizontalFlexWithMargins:nth-child(8),
 /* General */
 body {
   background: var(--background) !important;
+  color: var(--font-color) !important; /* site defaults body text to #000 -> black-on-black without this */
 }
 
 a, b, i, p, h1, h2, h3, h4, h5 {
@@ -507,5 +509,81 @@ body:has(#static-index) {
 
 #comment-list .col2 {
   color: lightgrey !important;
+}
+
+/* == Coverage fixes: elements rule34's own CSS colors that the base theme left unstyled == */
+
+/* muted / count text the site paints pure black */
+.tag-count, .obsolete-tag-change {
+  color: var(--dim) !important;
+}
+
+/* generic buttons + submit/reset inputs (site paints them light green / white) */
+button, input[type='submit'], input[type='button'], input[type='reset'], .gdprbutton button {
+  background: var(--background-search) !important;
+  color: var(--font-color) !important;
+  border: 1px solid var(--accent) !important;
+  border-radius: 3px !important;
+  cursor: pointer !important;
+  transition: 0.15s ease-in-out !important;
+}
+
+button:hover, input[type='submit']:hover, input[type='button']:hover,
+input[type='reset']:hover, .gdprbutton button:hover {
+  background: var(--accent) !important;
+  color: #fff !important;
+}
+
+/* any remaining text inputs / selects (white bg on secondary forms + :focus) */
+input:not([type]), input[type='text'], input[type='password'],
+input[type='search'], input[type='number'], select {
+  background: var(--background-search) !important;
+  color: var(--font-color) !important;
+  border: 1px solid transparent !important;
+  border-bottom: 1px solid var(--accent) !important;
+}
+
+input:focus, textarea:focus, select:focus {
+  background: var(--background-search) !important;
+  color: var(--font-color) !important;
+}
+
+/* light info / alert / cookie-consent boxes -> dark surfaces */
+.gdprcontainer, .gdprinner, .gdprtext,
+div.has-mail, div.status-notice, div.notice, div.blocked,
+div.auto_complete, div.auto_complete ul,
+div#note-container > div.note-body, div#note-container > div.note-box,
+div#note-container > div.unsaved, #edit-box {
+  background: var(--background-search) !important;
+  color: var(--font-color) !important;
+  border-color: var(--accent) !important;
+}
+
+/* autocomplete suggestions (site paints list text dark blue) */
+.awesomplete > ul > li, .awesomplete > ul > li a {
+  color: var(--font-color) !important;
+}
+
+/* generic tables on secondary pages (history, records, edit) */
+table th, table td {
+  color: var(--font-color) !important;
+}
+
+table.highlightable td {
+  border-color: var(--background-search) !important;
+}
+
+table.highlightable > tbody > tr:hover,
+table tr.good, table tr.selected, table tr.highlight, table tr.pending-tag {
+  background: var(--background-search) !important;
+}
+
+table tr:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* status/video thumb borders -> accent instead of raw blue/green */
+.webm-thumb, img.video, img.has-children, img.has-parent, img.flagged, img.pending {
+  border-color: var(--accent) !important;
 }
 `
