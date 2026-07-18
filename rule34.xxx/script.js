@@ -586,4 +586,30 @@ table tr:nth-child(odd) {
 .webm-thumb, img.video, img.has-children, img.has-parent, img.flagged, img.pending {
   border-color: var(--accent) !important;
 }
+
+/* edge pages (quotes, autocomplete mark, help code, tips banner, user records) */
+div.quote {
+  background: var(--background-search) !important;
+  border-color: var(--accent) !important;
+}
+
+.awesomplete mark {
+  color: #fff !important;
+}
+
+div.help div.code, div.help a.code {
+  background: var(--background-search) !important;
+  border-color: var(--accent) !important;
+  color: var(--font-color) !important;
+}
+
+div.tips {
+  background: var(--background-search) !important;
+  border-bottom-color: var(--accent) !important;
+  color: var(--font-color) !important;
+}
+
+div#user-record tr.positive-record, div#user-record tr.negative-record {
+  background: var(--background-search) !important;
+}
 `
