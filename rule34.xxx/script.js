@@ -612,4 +612,71 @@ div.tips {
 div#user-record tr.positive-record, div#user-record tr.negative-record {
   background: var(--background-search) !important;
 }
+
+/* native form controls -> themed (skip .tradio: hidden thumbnail-view toggles) */
+input[type='checkbox'], input[type='radio']:not(.tradio) {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 15px !important;
+  height: 15px !important;
+  margin: 0 6px 0 0 !important;
+  vertical-align: -2px !important;
+  background: var(--background-search) !important;
+  border: 1px solid var(--accent) !important;
+  cursor: pointer !important;
+  position: relative !important;
+  transition: 0.15s ease-in-out !important;
+}
+
+input[type='checkbox'] { border-radius: 3px !important; }
+input[type='radio']:not(.tradio) { border-radius: 50% !important; }
+
+input[type='checkbox']:checked, input[type='radio']:not(.tradio):checked {
+  background: var(--accent) !important;
+}
+
+input[type='checkbox']:checked::after {
+  content: '' !important;
+  position: absolute !important;
+  left: 4px !important;
+  top: 1px !important;
+  width: 4px !important;
+  height: 8px !important;
+  border: solid #fff !important;
+  border-width: 0 2px 2px 0 !important;
+  transform: rotate(45deg) !important;
+}
+
+input[type='radio']:not(.tradio):checked::after {
+  content: '' !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 50% !important;
+  background: #fff !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+/* select: flat box + accent chevron + dark options */
+select {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  padding: 4px 26px 4px 8px !important;
+  background: var(--background-search) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath fill='%233b82f6' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E") no-repeat right 9px center !important;
+  cursor: pointer !important;
+}
+
+select option {
+  background: var(--background-search) !important;
+  color: var(--font-color) !important;
+}
+
+/* scrollbar + text selection */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: var(--background); }
+::-webkit-scrollbar-thumb { background: var(--background-search); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+::selection { background: var(--accent); color: #fff; }
 `
