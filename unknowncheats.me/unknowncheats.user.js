@@ -2,7 +2,7 @@
 // @name         UnknownCheats OLED
 // @author       ryouzue
 // @description  OLED dark theme for unknowncheats.me, styled after sub.ryuo.to
-// @version      0.2.0
+// @version      0.2.1
 // @match        https://*.unknowncheats.me/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=unknowncheats.me
 // @updateURL    https://raw.githubusercontent.com/aquaryuo/userscripts/main/unknowncheats.me/unknowncheats.user.js
@@ -48,10 +48,8 @@ html, body {
   font-family: var(--font) !important;
 }
 
-body, td, th, p, li, div, span, .shade, .smallfont, .time {
-  color: var(--fg) !important;
-  font-family: var(--font) !important;
-}
+/* base text colour is set on html/body above and inherits — don't force it on
+   every div/span/td, which would flatten the site's username/rank/quote colours */
 
 h1, h2, h3, h4, .blockhead, .title {
   font-family: var(--font-display) !important;
@@ -174,13 +172,42 @@ a:visited { color: var(--accent) !important; filter: brightness(.85); }
 a:hover, a:active, a:focus { color: var(--fg) !important; filter: brightness(1.15); }
 
 /* == Forms ================================================= */
-input, textarea, select, .textbox, .bginput, .primary_content_area input {
+input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='image']):not([type='color']):not([type='range']),
+textarea, select, .textbox, .bginput {
   background: var(--bg3) !important;
   color: var(--fg) !important;
   border: 1px solid var(--line) !important;
   border-radius: var(--radius) !important;
   outline: none !important;
   padding: 6px 8px !important;
+}
+
+/* checkbox / radio -> themed accent controls (the bare input rule above would
+   otherwise turn them into 6px-padded boxes) */
+input[type='checkbox'], input[type='radio'] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 15px !important;
+  height: 15px !important;
+  margin: 0 6px 0 0 !important;
+  vertical-align: -2px !important;
+  background: var(--bg3) !important;
+  border: 1px solid var(--accent) !important;
+  cursor: pointer !important;
+  position: relative !important;
+}
+input[type='checkbox'] { border-radius: 3px !important; }
+input[type='radio'] { border-radius: 50% !important; }
+input[type='checkbox']:checked, input[type='radio']:checked { background: var(--accent) !important; }
+input[type='checkbox']:checked::after {
+  content: '' !important; position: absolute !important;
+  left: 4px !important; top: 1px !important; width: 4px !important; height: 8px !important;
+  border: solid #fff !important; border-width: 0 2px 2px 0 !important; transform: rotate(45deg) !important;
+}
+input[type='radio']:checked::after {
+  content: '' !important; position: absolute !important;
+  left: 50% !important; top: 50% !important; width: 6px !important; height: 6px !important;
+  border-radius: 50% !important; background: #fff !important; transform: translate(-50%, -50%) !important;
 }
 
 input:focus, textarea:focus, select:focus, .textbox:focus {
