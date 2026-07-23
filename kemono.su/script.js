@@ -658,9 +658,11 @@ const ensureBlacklistButton = () => {
   const actions = sel('.post__actions') || sel('.user-header__actions');
   const id = currentId();
   if (!actions || !id) return;
-  // Recompute the label every pass — after SPA nav the button stays attached but
-  // the creator (and thus blacklisted state) changes.
-  kt_bl.textContent = store.list('kt-blacklist').includes(id) ? '✔ Unblacklist' : '✘ Blacklist';
+  // Recompute the label after SPA nav, but only WRITE when it changes: assigning
+  // textContent is a childList mutation the observer watches, so an unconditional
+  // write would feed a permanent mutation -> rAF -> write loop.
+  const label = store.list('kt-blacklist').includes(id) ? '✔ Unblacklist' : '✘ Blacklist';
+  if (kt_bl.textContent !== label) kt_bl.textContent = label;
   if (!actions.contains(kt_bl)) actions.appendChild(kt_bl);
 };
 
