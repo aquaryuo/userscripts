@@ -518,15 +518,19 @@ const store = {
   get(key, def) {
     let v = GM_getValue(key, undefined);
     if (v === undefined) {
-      const ls = localStorage.getItem(key);
-      if (ls !== null) {
-        try { v = JSON.parse(ls); } catch (e) { v = ls; }
-        GM_setValue(key, v);
-      }
+      try {
+        const ls = localStorage.getItem(key);
+        if (ls !== null) {
+          try { v = JSON.parse(ls); } catch (e) { v = ls; }
+          GM_setValue(key, v);
+        }
+      } catch (e) { /* localStorage can be blocked in some contexts */ }
     }
     return v === undefined ? def : v;
   },
-  set: (key, val) => GM_setValue(key, val)
+  set: (key, val) => GM_setValue(key, val),
+  // Always an array — a corrupt/non-array legacy value must not break the blacklist.
+  list(key) { const v = this.get(key, []); return Array.isArray(v) ? v : []; }
 };
 
 /*
@@ -574,15 +578,16 @@ const maximizeSidebar = (obj) => {
   log(`Changed 'maximized' to ${!max}`);
 };
 
-// On a post page the creator is identified by name; elsewhere by id. Read fresh so
-// it reflects the current page after client-side navigation.
+// On /post/ pages meta[name="id"] is the POST id, so the creator id lives in
+// meta[name="user"]; elsewhere meta[name="id"] is already the creator id. Read
+// fresh each call so it reflects the current page after client-side navigation.
 const currentId = () => /\/post\//.test(path())
   ? (sel('meta[name="user"]')?.content || null)
   : (sel('meta[name="id"]')?.content || null);
 
 const blacklist = (id) => {
   if (id == null) return log('Invalid ID');
-  const bl = store.get('kt-blacklist', []);
+  const bl = store.list('kt-blacklist');
   if (!bl.includes(id)) {
     store.set('kt-blacklist', [...bl, id]);
     log('Added ' + id + ' to blacklist');
@@ -611,6 +616,7 @@ const linkify = (root) => {
   });
   const targets = [];
   while (walker.nextNode()) targets.push(walker.currentNode);
+  if (!targets.length) return; // nothing to wrap — don't touch the DOM
   targets.forEach(node => {
     const text = node.nodeValue,
       frag = document.createDocumentFragment();
@@ -651,14 +657,15 @@ const ensureSidebar = () => {
 const ensureBlacklistButton = () => {
   const actions = sel('.post__actions') || sel('.user-header__actions');
   const id = currentId();
-  if (actions && id && !actions.contains(kt_bl)) {
-    kt_bl.textContent = store.get('kt-blacklist', []).includes(id) ? '✔ Unblacklist' : '✘ Blacklist';
-    actions.appendChild(kt_bl);
-  }
+  if (!actions || !id) return;
+  // Recompute the label every pass — after SPA nav the button stays attached but
+  // the creator (and thus blacklisted state) changes.
+  kt_bl.textContent = store.list('kt-blacklist').includes(id) ? '✔ Unblacklist' : '✘ Blacklist';
+  if (!actions.contains(kt_bl)) actions.appendChild(kt_bl);
 };
 
 const ensureBlacklistFilter = () => {
-  const bl = new Set(store.get('kt-blacklist', []));
+  const bl = new Set(store.list('kt-blacklist'));
   sel('.post-card[data-user]', true).forEach(card => {
     if (bl.has(card.getAttribute('data-user'))) {
       card.style.setProperty('display', 'none', 'important');
@@ -678,11 +685,10 @@ const ensureHome = () => {
 };
 
 const ensureLinkify = () => {
-  sel('.dm-card__content, .post__content', true).forEach(obj => {
-    if (obj.dataset.ktLinkified) return;
-    obj.dataset.ktLinkified = '1';
-    linkify(obj);
-  });
+  // No marker: React can re-render the post body with fresh un-linkified text under
+  // the same element, so re-run every pass. linkify() is idempotent — it skips text
+  // already inside an <a> and touches the DOM only for still-unwrapped URLs.
+  sel('.dm-card__content, .post__content', true).forEach(linkify);
 };
 
 /*
