@@ -482,6 +482,110 @@ html:has(.maximized) .global-sidebar {
   color: rgb(var(--kt-inact-2));
 }
 
+/* blacklist manager panel */
+
+.kt-manage {
+  cursor: pointer;
+  margin-left: 8px;
+  font-size: 18px;
+  color: rgb(var(--kt-inact-1));
+}
+
+#kt-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  /* */
+  width: 420px;
+  max-width: 90vw;
+  max-height: 70vh;
+  /* */
+  display: none;
+  flex-direction: column;
+  /* */
+  background: rgb(var(--kt-background-sec)) !important;
+  border: 1px solid rgba(var(--kt-accent), 0.4) !important;
+  border-radius: 6px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6) !important;
+  color: rgb(var(--kt-color));
+  z-index: 100;
+}
+
+#kt-panel.open { display: flex; }
+
+.kt-panel__head, .kt-panel__foot {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+}
+
+.kt-panel__head {
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(var(--kt-accent), 0.25) !important;
+}
+
+.kt-panel__head h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.kt-panel__close { cursor: pointer; font-size: 1.1rem; }
+
+.kt-panel__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+
+.kt-panel__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+}
+
+.kt-panel__row:hover { background: rgba(var(--kt-accent), 0.12); }
+
+.kt-panel__row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* the theme's global small rule is 20px/600 — keep the id subordinate */
+.kt-panel__row small {
+  color: rgb(var(--kt-inact-2));
+  font-size: 0.8em !important;
+  font-weight: 400 !important;
+}
+
+.kt-panel__row button, .kt-panel__foot button {
+  cursor: pointer;
+  padding: 3px 10px;
+  border-radius: 3px;
+  border: 1px solid rgba(var(--kt-accent), 0.5) !important;
+  color: rgb(var(--kt-color));
+  transition: 0.15s ease-in-out;
+}
+
+.kt-panel__row button:hover, .kt-panel__foot button:hover {
+  background: rgba(var(--kt-accent), 0.3) !important;
+}
+
+.kt-panel__foot {
+  gap: 8px;
+  border-top: 1px solid rgba(var(--kt-accent), 0.25) !important;
+}
+
+.kt-panel__empty {
+  padding: 18px 14px;
+  text-align: center;
+  color: rgb(var(--kt-inact-2));
+}
+
 /* loading */
 
 #loading-line {
@@ -566,6 +670,44 @@ const kt_bl = mke('button');
 kt_bl.className = 'kt-blacklist';
 kt_bl.type = 'button';
 
+/* Blacklist manager — the only way to un-blacklist without revisiting the creator */
+const kt_mg = mke('button');
+kt_mg.className = 'kt-manage';
+kt_mg.type = 'button';
+kt_mg.title = 'Manage blacklist';
+kt_mg.textContent = '☰';
+
+const kt_panel = mke('div');
+kt_panel.id = 'kt-panel';
+
+const kt_panel__head = mke('div');
+kt_panel__head.className = 'kt-panel__head';
+const kt_panel__title = mke('h3');
+const kt_panel__close = mke('button');
+kt_panel__close.className = 'kt-panel__close';
+kt_panel__close.type = 'button';
+kt_panel__close.textContent = '✕';
+kt_panel__head.appendChild(kt_panel__title);
+kt_panel__head.appendChild(kt_panel__close);
+
+const kt_panel__list = mke('div');
+kt_panel__list.className = 'kt-panel__list';
+
+const kt_panel__foot = mke('div');
+kt_panel__foot.className = 'kt-panel__foot';
+const kt_panel__copy = mke('button');
+kt_panel__copy.type = 'button';
+kt_panel__copy.textContent = 'Copy JSON';
+const kt_panel__clear = mke('button');
+kt_panel__clear.type = 'button';
+kt_panel__clear.textContent = 'Clear all';
+kt_panel__foot.appendChild(kt_panel__copy);
+kt_panel__foot.appendChild(kt_panel__clear);
+
+kt_panel.appendChild(kt_panel__head);
+kt_panel.appendChild(kt_panel__list);
+kt_panel.appendChild(kt_panel__foot);
+
 document.addEventListener('dragstart', (e) => e.preventDefault());
 
 /*
@@ -585,11 +727,26 @@ const currentId = () => /\/post\//.test(path())
   ? (sel('meta[name="user"]')?.content || null)
   : (sel('meta[name="id"]')?.content || null);
 
+// Best-effort display name so the manager shows something friendlier than a raw
+// id. Falls back to the id when the selectors don't match.
+const currentName = () => {
+  const el = sel('.user-header__name') || sel('.post__user-name') || sel('.post__user');
+  const t = el && el.textContent ? el.textContent.trim() : '';
+  return t && t.length < 80 ? t : null;
+};
+
+const names = () => {
+  const v = store.get('kt-blacklist-names', {});
+  return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+};
+
 const blacklist = (id) => {
   if (id == null) return log('Invalid ID');
   const bl = store.list('kt-blacklist');
   if (!bl.includes(id)) {
     store.set('kt-blacklist', [...bl, id]);
+    const nm = currentName();
+    if (nm) store.set('kt-blacklist-names', { ...names(), [id]: nm });
     log('Added ' + id + ' to blacklist');
     kt_bl.textContent = '✔ Unblacklist';
     ensureBlacklistFilter();
@@ -639,6 +796,97 @@ const linkify = (root) => {
 };
 
 /*
+-> Blacklist manager panel
+
+renderPanel only rewrites the list when the stored blacklist actually changes
+(childList writes are what the observer watches, so an unconditional rebuild each
+pass would feed a write -> mutation -> rAF -> write loop). Open/close uses a class,
+which is an attribute mutation the observer ignores.
+*/
+let panelSig = null;
+
+const renderPanel = (force) => {
+  const bl = store.list('kt-blacklist');
+  const sig = JSON.stringify(bl);
+  if (!force && sig === panelSig) return;
+  panelSig = sig;
+
+  const title = `Blacklist (${bl.length})`;
+  if (kt_panel__title.textContent !== title) kt_panel__title.textContent = title;
+
+  kt_panel__list.textContent = '';
+  if (!bl.length) {
+    const empty = mke('div');
+    empty.className = 'kt-panel__empty';
+    empty.textContent = 'Nothing blacklisted.';
+    kt_panel__list.appendChild(empty);
+    return;
+  }
+
+  const nm = names();
+  bl.forEach(id => {
+    const row = mke('div');
+    row.className = 'kt-panel__row';
+
+    const label = mke('span');
+    label.textContent = nm[id] || id;
+    if (nm[id]) {
+      const s = mke('small');
+      s.textContent = ' · ' + id;
+      label.appendChild(s);
+    }
+
+    const rm = mke('button');
+    rm.type = 'button';
+    rm.textContent = 'Remove';
+    rm.addEventListener('click', () => {
+      store.set('kt-blacklist', store.list('kt-blacklist').filter(x => x !== id));
+      renderPanel(true);
+      ensureBlacklistFilter();
+      log('Removed ' + id + ' from blacklist');
+    });
+
+    row.appendChild(label);
+    row.appendChild(rm);
+    kt_panel__list.appendChild(row);
+  });
+};
+
+kt_mg.addEventListener('click', () => {
+  kt_panel.classList.toggle('open');
+  if (kt_panel.classList.contains('open')) renderPanel(true);
+});
+kt_panel__close.addEventListener('click', () => kt_panel.classList.remove('open'));
+
+kt_panel__copy.addEventListener('click', () => {
+  const data = JSON.stringify({ blacklist: store.list('kt-blacklist'), names: names() }, null, 2);
+  const done = (msg) => {
+    kt_panel__copy.textContent = msg;
+    setTimeout(() => { kt_panel__copy.textContent = 'Copy JSON'; }, 1500);
+  };
+  if (navigator.clipboard) navigator.clipboard.writeText(data).then(() => done('Copied'), () => done('Blocked'));
+  else done('Blocked');
+});
+
+// Two-click confirm rather than a modal dialog.
+let clearArmed = false;
+kt_panel__clear.addEventListener('click', () => {
+  if (!clearArmed) {
+    clearArmed = true;
+    kt_panel__clear.textContent = 'Sure?';
+    setTimeout(() => { if (clearArmed) { clearArmed = false; kt_panel__clear.textContent = 'Clear all'; } }, 3000);
+    return;
+  }
+  clearArmed = false;
+  kt_panel__clear.textContent = 'Clear all';
+  store.set('kt-blacklist', []);
+  store.set('kt-blacklist-names', {});
+  renderPanel(true);
+  ensureBlacklistFilter();
+  log('Blacklist cleared');
+});
+
+/*
 -> Idempotent "ensure" passes
 
 Each pass finds its target in the current DOM and applies its effect at most once
@@ -650,8 +898,16 @@ the old one-shot is*Loaded flags did not.
 const ensureSidebar = () => {
   const sidebar = sel('.global-sidebar');
   const host = sidebar && sidebar.childNodes[1];
-  if (host && host.nodeType === 1 && !host.contains(kt_sb)) host.appendChild(kt_sb);
+  if (host && host.nodeType === 1) {
+    if (!host.contains(kt_sb)) host.appendChild(kt_sb);
+    if (!host.contains(kt_mg)) host.appendChild(kt_mg);
+  }
   if (document.body) document.body.classList.toggle('maximized', !!store.get('kt-maximize', false));
+};
+
+const ensurePanel = () => {
+  if (document.body && !document.body.contains(kt_panel)) document.body.appendChild(kt_panel);
+  if (kt_panel.classList.contains('open')) renderPanel(false); // sig-guarded: no-op when unchanged
 };
 
 const ensureBlacklistButton = () => {
@@ -701,6 +957,7 @@ const applyAll = () => {
   scheduled = false; // set first so mutations during the pass schedule the next one
   try {
     ensureSidebar();
+    ensurePanel();
     ensureBlacklistButton();
     ensureBlacklistFilter();
     ensureHome();
