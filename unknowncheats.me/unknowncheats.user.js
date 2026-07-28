@@ -2,7 +2,7 @@
 // @name         UnknownCheats OLED
 // @author       ryouzue
 // @description  OLED dark theme for unknowncheats.me, styled after sub.ryuo.to
-// @version      0.2.1
+// @version      0.2.2
 // @match        https://*.unknowncheats.me/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=unknowncheats.me
 // @updateURL    https://raw.githubusercontent.com/aquaryuo/userscripts/main/unknowncheats.me/unknowncheats.user.js
@@ -172,7 +172,12 @@ a:visited { color: var(--accent) !important; filter: brightness(.85); }
 a:hover, a:active, a:focus { color: var(--fg) !important; filter: brightness(1.15); }
 
 /* == Forms ================================================= */
-input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='image']):not([type='color']):not([type='range']),
+/* positive allow-list, not a :not() chain — six chained :not()s scored (0,6,1) and
+   beat input[type='submit'] (0,1,1) and input:focus, so submit buttons rendered as
+   text fields and focus rings never showed */
+input:not([type]), input[type='text'], input[type='password'], input[type='search'],
+input[type='email'], input[type='url'], input[type='tel'], input[type='number'],
+input[type='date'], input[type='datetime-local'],
 textarea, select, .textbox, .bginput {
   background: var(--bg3) !important;
   color: var(--fg) !important;
