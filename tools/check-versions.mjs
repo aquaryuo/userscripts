@@ -25,7 +25,10 @@ for (const d of readdirSync(root, { withFileTypes: true })) {
     const issues = [];
     if (!ver) issues.push('no @version');
     if (req && req !== ver) issues.push(`@require ?v=${req} != @version ${ver}`);
-    if (rmVer && rmVer !== ver) issues.push(`README ${rmVer} != @version ${ver}`);
+    // A missing row (or a row with no version) used to skip the comparison and pass.
+    if (!row) issues.push('no README table row');
+    else if (!rmVer) issues.push('README row has no version');
+    else if (rmVer !== ver) issues.push(`README ${rmVer} != @version ${ver}`);
 
     if (issues.length) { console.error(`✗ ${d.name}/${f}: ${issues.join('; ')}`); bad++; }
     else console.log(`✓ ${d.name}/${f} @ ${ver}`);
