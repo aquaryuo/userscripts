@@ -7,9 +7,12 @@ document.onreadystatechange = () => {
     if(window.location.pathname === '/') {
       // Index
       const static__index = document.querySelector('#static-index');
-    
+
       // Replace p with div for index-header
       const index__header = document.querySelector('.index-header');
+      // Bail if the index markup isn't what we expect — otherwise the derefs below
+      // throw and abort the whole handler.
+      if (!static__index || !index__header) return;
       const new__index__header = document.createElement('div');
       new__index__header.className = 'index-header';
     
@@ -30,12 +33,12 @@ document.onreadystatechange = () => {
       const search__index__form = document.querySelector('.space form');
       const new__search__index = document.createElement('div');
       new__search__index.id = 'search-index';
-    
+
       static__index.appendChild(new__search__index);
-      new__search__index.appendChild(search__index__form);
-    
+      if (search__index__form) new__search__index.appendChild(search__index__form);
+
       const old__search__index = document.querySelector('.space');
-      old__search__index.remove();
+      if (old__search__index) old__search__index.remove();
     
       // Assign a class to search-index to recognize it is home
       new__search__index.className = 'home';
@@ -46,13 +49,15 @@ document.onreadystatechange = () => {
     } else {
       // After Index
     
-      // Define search-index class as on homepage
+      // Define search-index class as on homepage. Both are absent on secondary pages
+      // (tags, comments, forum, wiki...) where this used to throw a TypeError.
       const search__index = document.querySelector('.tag-search');
-      search__index.id = 'search-index';
-    
-      // Move search index to navigation bar
       const navbar = document.querySelector('#site-title');
-      navbar.appendChild(search__index);
+      if (search__index && navbar) {
+        search__index.id = 'search-index';
+        // Move search index to navigation bar
+        navbar.appendChild(search__index);
+      }
     }
   }
 };
