@@ -602,6 +602,10 @@ html:has(.maximized) .global-sidebar {
 */
 
 const isURL = /https?:\/\/[^\s]+/g,
+  // Non-global twin of isURL for .test() — the walker's filter MUST agree exactly
+  // with the rewriter, or an accepted-but-unmatchable node gets replaced by an
+  // identical copy every frame (childList mutation -> observer -> rAF -> repeat).
+  hasURL = /https?:\/\/[^\s]+/,
   sel = (el, all) => all ? document.querySelectorAll(el) : document.querySelector(el),
   log = obj => console.log(`%cKemono Tools ::`, 'color:orange;', obj),
   mke = obj => document.createElement(obj),
@@ -730,6 +734,10 @@ const currentId = () => /\/post\//.test(path())
 // Best-effort display name so the manager shows something friendlier than a raw
 // id. Falls back to the id when the selectors don't match.
 const currentName = () => {
+  // meta[name="artist_name"] is present on creator pages (verified on kemono.cr) and
+  // beats scraping the DOM; the class selectors cover post pages.
+  const meta = sel('meta[name="artist_name"]')?.content;
+  if (meta && meta.trim()) return meta.trim().slice(0, 80);
   const el = sel('.user-header__name') || sel('.post__user-name') || sel('.post__user');
   const t = el && el.textContent ? el.textContent.trim() : '';
   return t && t.length < 80 ? t : null;
@@ -738,6 +746,13 @@ const currentName = () => {
 const names = () => {
   const v = store.get('kt-blacklist-names', {});
   return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+};
+
+// Drop a name whenever its id leaves the blacklist, so the map can't accumulate
+// orphans (which also leaked into the Copy JSON export).
+const forgetName = (id) => {
+  const nm = { ...names() };
+  if (id in nm) { delete nm[id]; store.set('kt-blacklist-names', nm); }
 };
 
 const blacklist = (id) => {
@@ -753,6 +768,7 @@ const blacklist = (id) => {
     history.back();
   } else {
     store.set('kt-blacklist', bl.filter(x => x !== id));
+    forgetName(id);
     log('Removed ' + id + ' from blacklist');
     kt_bl.textContent = '✘ Blacklist';
     ensureBlacklistFilter();
@@ -767,7 +783,7 @@ kt_bl.addEventListener('click', () => blacklist(currentId()));
 const linkify = (root) => {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode: node =>
-      node.parentElement && !node.parentElement.closest('a') && /https?:\/\//.test(node.nodeValue)
+      node.parentElement && !node.parentElement.closest('a') && hasURL.test(node.nodeValue)
         ? NodeFilter.FILTER_ACCEPT
         : NodeFilter.FILTER_REJECT
   });
@@ -790,6 +806,7 @@ const linkify = (root) => {
       last = offset + url.length;
       return url;
     });
+    if (!last) return; // nothing matched — replacing would just swap in an identical node
     if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
     node.parentNode.replaceChild(frag, node);
   });
@@ -841,6 +858,7 @@ const renderPanel = (force) => {
     rm.textContent = 'Remove';
     rm.addEventListener('click', () => {
       store.set('kt-blacklist', store.list('kt-blacklist').filter(x => x !== id));
+      forgetName(id);
       renderPanel(true);
       ensureBlacklistFilter();
       log('Removed ' + id + ' from blacklist');
@@ -897,7 +915,10 @@ the old one-shot is*Loaded flags did not.
 */
 const ensureSidebar = () => {
   const sidebar = sel('.global-sidebar');
-  const host = sidebar && sidebar.childNodes[1];
+  // The header row (child 0) is where the site's own .close-sidebar button lives and
+  // is the only part still on-screen while the sidebar is collapsed; childNodes[1] is
+  // the first nav group, which pushes our glyphs off-screen. Verified on kemono.cr.
+  const host = sidebar && (sidebar.querySelector('.clickable-header-entry') || sidebar.childNodes[0]);
   if (host && host.nodeType === 1) {
     if (!host.contains(kt_sb)) host.appendChild(kt_sb);
     if (!host.contains(kt_mg)) host.appendChild(kt_mg);
@@ -943,10 +964,12 @@ const ensureHome = () => {
 };
 
 const ensureLinkify = () => {
-  // No marker: React can re-render the post body with fresh un-linkified text under
-  // the same element, so re-run every pass. linkify() is idempotent — it skips text
+  // .post__body is the live container (verified on kemono.cr); .post__content and
+  // .dm-card__content are kept as fallbacks for other/older page types.
+  // No marker: React can re-render the body with fresh un-linkified text under the
+  // same element, so re-run every pass. linkify() is idempotent — it skips text
   // already inside an <a> and touches the DOM only for still-unwrapped URLs.
-  sel('.dm-card__content, .post__content', true).forEach(linkify);
+  sel('.post__body, .post__content, .dm-card__content', true).forEach(linkify);
 };
 
 /*
