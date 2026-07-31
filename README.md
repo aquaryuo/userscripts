@@ -17,7 +17,7 @@ If a click doesn't prompt an install, use the fallback: Tampermonkey **Dashboard
 
 | Folder | Script | Site | Version | Status | Install |
 | ------ | ------ | ---- | ------- | ------ | ------- |
-| [`kemono.su/`](kemono.su/) | Kemono Tools | kemono.su / kemono.cr | 0.4.4 | Stable | [![Install](https://img.shields.io/badge/DOWNLOAD-3b82f6?style=for-the-badge&logo=tampermonkey&logoColor=white)](https://raw.githubusercontent.com/aquaryuo/userscripts/main/kemono.su/kemono.user.js) |
+| [`kemono.su/`](kemono.su/) | Kemono Tools | kemono.su / kemono.cr | 0.4.5 | Stable | [![Install](https://img.shields.io/badge/DOWNLOAD-3b82f6?style=for-the-badge&logo=tampermonkey&logoColor=white)](https://raw.githubusercontent.com/aquaryuo/userscripts/main/kemono.su/kemono.user.js) |
 | [`bilibili.com/`](bilibili.com/) | Bilibili Fixes | bilibili.com | 0.1.2 | Stable | [![Install](https://img.shields.io/badge/DOWNLOAD-3b82f6?style=for-the-badge&logo=tampermonkey&logoColor=white)](https://raw.githubusercontent.com/aquaryuo/userscripts/main/bilibili.com/bilibili.user.js) |
 | [`rule34.xxx/`](rule34.xxx/) | Dark Theme | rule34.xxx | 0.1.11 | Stable | [![Install](https://img.shields.io/badge/DOWNLOAD-3b82f6?style=for-the-badge&logo=tampermonkey&logoColor=white)](https://raw.githubusercontent.com/aquaryuo/userscripts/main/rule34.xxx/rule34.user.js) |
 | [`unknowncheats.me/`](unknowncheats.me/) | UnknownCheats OLED | unknowncheats.me | 0.2.2 | Unverified | [![Install](https://img.shields.io/badge/DOWNLOAD-3b82f6?style=for-the-badge&logo=tampermonkey&logoColor=white)](https://raw.githubusercontent.com/aquaryuo/userscripts/main/unknowncheats.me/unknowncheats.user.js) |
