@@ -731,6 +731,17 @@ const currentId = () => /\/post\//.test(path())
   ? (sel('meta[name="user"]')?.content || null)
   : (sel('meta[name="id"]')?.content || null);
 
+// Creator ids are only unique WITHIN a service, so the stored key is service/id.
+// Bare-id entries from older versions still match (legacy wildcard) and are dropped
+// on un-blacklist, so existing blacklists keep working without a migration step.
+const currentService = () => sel('meta[name="service"]')?.content || null;
+const keyOf = (service, id) => (service ? service + '/' + id : id);
+const currentKey = () => {
+  const id = currentId();
+  return id ? keyOf(currentService(), id) : null;
+};
+const listedIn = (bl, service, id) => bl.has(keyOf(service, id)) || bl.has(id);
+
 // Best-effort display name so the manager shows something friendlier than a raw
 // id. Falls back to the id when the selectors don't match.
 const currentName = () => {
@@ -755,28 +766,32 @@ const forgetName = (id) => {
   if (id in nm) { delete nm[id]; store.set('kt-blacklist-names', nm); }
 };
 
-const blacklist = (id) => {
+const blacklist = () => {
+  const id = currentId();
   if (id == null) return log('Invalid ID');
+  const service = currentService();
+  const key = keyOf(service, id);
   const bl = store.list('kt-blacklist');
-  if (!bl.includes(id)) {
-    store.set('kt-blacklist', [...bl, id]);
+  if (!listedIn(new Set(bl), service, id)) {
+    store.set('kt-blacklist', [...bl, key]);
     const nm = currentName();
-    if (nm) store.set('kt-blacklist-names', { ...names(), [id]: nm });
-    log('Added ' + id + ' to blacklist');
+    if (nm) store.set('kt-blacklist-names', { ...names(), [key]: nm });
+    log('Added ' + key + ' to blacklist');
     kt_bl.textContent = '✔ Unblacklist';
     ensureBlacklistFilter();
     history.back();
   } else {
-    store.set('kt-blacklist', bl.filter(x => x !== id));
+    store.set('kt-blacklist', bl.filter(x => x !== key && x !== id));
+    forgetName(key);
     forgetName(id);
-    log('Removed ' + id + ' from blacklist');
+    log('Removed ' + key + ' from blacklist');
     kt_bl.textContent = '✘ Blacklist';
     ensureBlacklistFilter();
   }
 };
 
 kt_sb.addEventListener('click', () => document.body && maximizeSidebar(document.body));
-kt_bl.addEventListener('click', () => blacklist(currentId()));
+kt_bl.addEventListener('click', () => blacklist());
 
 // Wrap bare URLs in <a> by rewriting text nodes only, so the post's existing
 // markup and event listeners survive and post text can never become live HTML.
@@ -935,10 +950,11 @@ const ensureBlacklistButton = () => {
   const actions = sel('.post__actions') || sel('.user-header__actions');
   const id = currentId();
   if (!actions || !id) return;
+  const service = currentService();
   // Recompute the label after SPA nav, but only WRITE when it changes: assigning
   // textContent is a childList mutation the observer watches, so an unconditional
   // write would feed a permanent mutation -> rAF -> write loop.
-  const label = store.list('kt-blacklist').includes(id) ? '✔ Unblacklist' : '✘ Blacklist';
+  const label = listedIn(new Set(store.list('kt-blacklist')), service, id) ? '✔ Unblacklist' : '✘ Blacklist';
   if (kt_bl.textContent !== label) kt_bl.textContent = label;
   if (!actions.contains(kt_bl)) actions.appendChild(kt_bl);
 };
@@ -946,7 +962,7 @@ const ensureBlacklistButton = () => {
 const ensureBlacklistFilter = () => {
   const bl = new Set(store.list('kt-blacklist'));
   sel('.post-card[data-user]', true).forEach(card => {
-    if (bl.has(card.getAttribute('data-user'))) {
+    if (listedIn(bl, card.getAttribute('data-service'), card.getAttribute('data-user'))) {
       card.style.setProperty('display', 'none', 'important');
       card.dataset.ktHidden = '1';
     } else if (card.dataset.ktHidden) { // only un-hide cards we hid
