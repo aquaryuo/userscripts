@@ -2,7 +2,7 @@
 // @name         UnknownCheats OLED
 // @author       ryouzue
 // @description  OLED dark theme for unknowncheats.me, styled after sub.ryuo.to
-// @version      0.3.0
+// @version      0.3.1
 // @match        https://*.unknowncheats.me/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=unknowncheats.me
 // @updateURL    https://raw.githubusercontent.com/aquaryuo/userscripts/main/unknowncheats.me/unknowncheats.user.js
@@ -92,11 +92,21 @@ body, .page, .tborder, .tcat, .thead, .tfoot, .alt1, .alt1Active, .alt2, .alt,
   display: none !important;
 }
 
-/* == Tables: the vB3 skeleton ============================== */
+/* == Tables: the vB3 skeleton ==============================
+   vB3 draws its grid by bleeding .tborder's background through the 1px
+   cellspacing gaps of ~49 tables per page. Painting that background a visible
+   colour turns every gap into a line, which is where the wall of borders came
+   from — keep it transparent and let the .alt1/.alt2 row fills carry structure.
+   ========================================================== */
 .tborder {
-  background: var(--line) !important;
-  border: 1px solid var(--line) !important;
+  background: transparent !important;
+  border: none !important;
   border-radius: var(--radius) !important;
+}
+
+/* strip the legacy table borders/rules vB3 still emits as attributes */
+table[border], table[rules], td[style*="border"], th[style*="border"] {
+  border: none !important;
 }
 
 .tcat {
@@ -146,7 +156,7 @@ body, .page, .tborder, .tcat, .thead, .tfoot, .alt1, .alt1Active, .alt2, .alt,
 #navbar, .navbar {
   background: var(--bg2) !important;
   color: var(--fg) !important;
-  border: 1px solid var(--line) !important;
+  border: none !important;
   border-radius: var(--radius) !important;
 }
 
@@ -216,6 +226,12 @@ body, .page, .tborder, .tcat, .thead, .tfoot, .alt1, .alt1Active, .alt2, .alt,
 a, a:link { color: var(--accent) !important; }
 a:visited { color: var(--accent) !important; filter: brightness(.85); }
 a:hover, a:active, a:focus { color: var(--fg) !important; }
+
+/* livetopic.css paints .td1/.td2 with black text for a light skin */
+.td1, .td2, td.td1, td.td2 {
+  background: transparent !important;
+  color: var(--fg) !important;
+}
 
 /* == Muted text ============================================ */
 .smallfont, .time, .shade {
@@ -299,11 +315,26 @@ button:hover, input[type='submit']:hover, input[type='button']:hover, .button:ho
   color: var(--accent-ink) !important;
 }
 
-/* == Consent / third-party overlays ======================== */
-.qc-cmp2-container, .qc-cmp2-main, .qc-cmp2-summary-section, .qc-cmp2-footer {
-  background: var(--bg2) !important;
+/* == Consent / third-party overlays ========================
+   The Quantcast dialog styles itself with hashed emotion .css-* classes, which
+   change between deploys — so theme from its stable .qc-cmp-cleanslate root
+   rather than chasing the hashes. Buttons keep their own fill below.
+   ========================================================== */
+.qc-cmp-cleanslate, .qc-cmp2-container, .qc-cmp2-main,
+.qc-cmp-cleanslate div, .qc-cmp-cleanslate section, .qc-cmp-cleanslate p,
+.qc-cmp-cleanslate span, .qc-cmp-cleanslate h1, .qc-cmp-cleanslate h2 {
+  background-color: var(--bg2) !important;
   color: var(--fg) !important;
+  border-color: var(--line) !important;
 }
+
+.qc-cmp-cleanslate button {
+  background-color: var(--accent-soft) !important;
+  color: var(--fg) !important;
+  border-color: var(--accent) !important;
+}
+
+.qc-cmp-cleanslate a { color: var(--accent) !important; }
 
 /* == Legacy inline colours =================================
    vB3 posts carry inline style="color: black" (~91 on a thread) and a few
@@ -332,8 +363,32 @@ font[color="navy" i], font[color="black" i], font[color="#000000" i] {
   color: #4ade80 !important;
 }
 
-/* == Light surfaces the site CSS still paints ============== */
+/* == Light surfaces the site CSS still paints ==============
+   prettify.css (the code highlighter, everywhere on a coding forum) hardcodes
+   background:#fff on ol.linenums and every li.L0-L9, and posts carry a handful
+   of inline light fills. Those are the white blocks, not the icon images —
+   the reputation/status GIFs are alpha and the xperience bars are opaque green.
+   ========================================================== */
 table { background-color: transparent !important; }
+
+pre.prettyprint, code.prettyprint, .prettyprint,
+ol.linenums, ol.linenums li,
+li.L0, li.L1, li.L2, li.L3, li.L4, li.L5, li.L6, li.L7, li.L8, li.L9 {
+  background: var(--bg3) !important;
+  color: var(--fg) !important;
+  border-color: var(--line) !important;
+}
+
+[style*="background: #f7f7f7" i], [style*="background:#f7f7f7" i],
+[style*="background-color: #f7f7f7" i], [style*="background-color:#f7f7f7" i],
+[style*="background: #ededed" i], [style*="background:#ededed" i],
+[style*="background-color: #ededed" i], [style*="background-color:#ededed" i],
+[style*="background: #fdfdfd" i], [style*="background-color: #fdfdfd" i],
+[style*="background: #ffffe1" i], [style*="background:#ffffe1" i],
+[style*="background-color: #fff" i], [style*="background:#fff" i] {
+  background: var(--bg2) !important;
+  color: var(--fg) !important;
+}
 
 div.info, #presence-container, .presence-contents {
   background: var(--bg2) !important;
@@ -341,12 +396,21 @@ div.info, #presence-container, .presence-contents {
   border-color: var(--line) !important;
 }
 
+/* == Image-based progress bars =============================
+   The xperience points/level/activity bars are opaque colour strips, not CSS —
+   red.png and green.png measure luminance .62/.66, so they glare as bright
+   blocks on OLED. Dim them but keep the hue so the progress still reads.
+   ========================================================== */
+img[src*="/xperience/images/"] {
+  filter: brightness(0.5) saturate(1.15) !important;
+}
+
 /* == Misc ================================================== */
 hr { border-color: var(--line) !important; }
 
 fieldset, .panel, .panelsurround {
   background: var(--bg2) !important;
-  border: 1px solid var(--line) !important;
+  border: none !important;
   border-radius: var(--radius) !important;
   color: var(--fg) !important;
 }
