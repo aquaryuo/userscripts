@@ -92,7 +92,8 @@ select {
 .jumbo-welcome-mascot > div > img, #display-status, .site-section__header, #paginator-top menu,
 #paginator-bottom small, .content-wrapper a:nth-child(3), .post__footer:has(.post__comments--no-comments),
 .jumbo-welcome-background, .jumbo-welcome-credits, #search-form .subtitle, #loading span, .user-header__upload,
-.content-wrapper > aside, .backdrop.backdrop-hidden {
+.content-wrapper > aside, .backdrop.backdrop-hidden,
+[class*='mn-thumb'], [id^='mn-thumb'], [class*='tsyndicate'] {
   display: none !important;
 }
 
@@ -328,6 +329,15 @@ body:has(.site-section--home) .content-wrapper .main {
 .paginator menu li {
   color: rgb(var(--kt-accent)) !important;
   border-radius: 2px !important;
+}
+
+/* the current page sits on a 60%-accent fill, so accent-on-accent text is
+   unreadable — ink it white instead */
+.pagination-button-current,
+.pagination-button-current a,
+.pagination-button-current b,
+.paginator menu .pagination-button-current * {
+  color: #fff !important;
 }
 
 /* Tags page */
