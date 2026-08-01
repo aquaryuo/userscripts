@@ -20,14 +20,14 @@ If a click doesn't prompt an install, use the fallback: Tampermonkey **Dashboard
 | [`kemono.su/`](kemono.su/) | Kemono Tools | kemono.su / kemono.cr | 0.4.5 | Stable | [![Install](https://img.shields.io/badge/DOWNLOAD-3b82f6?style=for-the-badge&logo=tampermonkey&logoColor=white)](https://raw.githubusercontent.com/aquaryuo/userscripts/main/kemono.su/kemono.user.js) |
 | [`bilibili.com/`](bilibili.com/) | Bilibili Fixes | bilibili.com | 0.1.2 | Stable | [![Install](https://img.shields.io/badge/DOWNLOAD-3b82f6?style=for-the-badge&logo=tampermonkey&logoColor=white)](https://raw.githubusercontent.com/aquaryuo/userscripts/main/bilibili.com/bilibili.user.js) |
 | [`rule34.xxx/`](rule34.xxx/) | Dark Theme | rule34.xxx | 0.1.11 | Stable | [![Install](https://img.shields.io/badge/DOWNLOAD-3b82f6?style=for-the-badge&logo=tampermonkey&logoColor=white)](https://raw.githubusercontent.com/aquaryuo/userscripts/main/rule34.xxx/rule34.user.js) |
-| [`unknowncheats.me/`](unknowncheats.me/) | UnknownCheats OLED | unknowncheats.me | 0.2.2 | Unverified | [![Install](https://img.shields.io/badge/DOWNLOAD-3b82f6?style=for-the-badge&logo=tampermonkey&logoColor=white)](https://raw.githubusercontent.com/aquaryuo/userscripts/main/unknowncheats.me/unknowncheats.user.js) |
+| [`unknowncheats.me/`](unknowncheats.me/) | UnknownCheats OLED | unknowncheats.me | 0.3.0 | Stable | [![Install](https://img.shields.io/badge/DOWNLOAD-3b82f6?style=for-the-badge&logo=tampermonkey&logoColor=white)](https://raw.githubusercontent.com/aquaryuo/userscripts/main/unknowncheats.me/unknowncheats.user.js) |
 | [`youtube.com/`](youtube.com/) | Palette seed | youtube.com | 0.1.5 | Seed | ![Seed](https://img.shields.io/badge/SEED-6b7280?style=for-the-badge) |
 | [`v3rmillion.rip/`](v3rmillion.rip/) | Dark Theme | ~~v3rmillion.rip~~ | 0.1.5 | Deprecated | ![Deprecated](https://img.shields.io/badge/DEPRECATED-6b7280?style=for-the-badge) |
 
-**Status** — *Stable*: in use and verified. *Unverified*: functional but not yet validated
-against the live site (`unknowncheats.me` was written against stock vBulletin-4 selectors).
-*Seed*: only declares the shared palette, applies no visible styling yet (`youtube.com` — no
-install button). *Deprecated*: site offline, kept for archival.
+**Status** — *Stable*: in use and validated against the live site. *Unverified*: functional but
+not yet checked against the real markup. *Seed*: only declares the shared palette, applies no
+visible styling yet (`youtube.com` — no install button). *Deprecated*: site offline, kept for
+archival.
 
 `kemono.su/` is the most fully-featured (theme + collapsible sidebar + per-creator
 blacklist + URL linkifier) and has its own [README](kemono.su/README.md); the rest are
