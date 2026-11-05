@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Kemono Tools
-// @author       ryouzue
+// @author       aquaryuo
 // @description  An utility tool with theme for kemono.su / kemono.cr
 // @version      0.4.6
 // @match        https://kemono.su/*

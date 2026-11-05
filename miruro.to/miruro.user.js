@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Miruro x ws.ryuo.to Sync
-// @author       ryouzue
+// @author       aquaryuo
 // @description  Syncs watch progress between ws.ryuo.to and Miruro without logging in to AniList or MAL on Miruro
 // @version      0.1.0
 // @match        https://ws.ryuo.to/*

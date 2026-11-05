@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Dark Theme (DEPRECATED — v3rmillion.rip is offline)
-// @author       ryouzue
+// @author       aquaryuo
 // @description  DEPRECATED: v3rmillion.rip no longer exists; retained for archival only
 // @version      0.1.5
 // @match        https://v3rmillion.rip/*

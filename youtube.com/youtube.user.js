@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         YouTube Dark
-// @author       ryouzue
+// @author       aquaryuo
 // @description  Unified OLED palette seed for youtube.com
 // @version      0.1.5
 // @match        https://*.youtube.com/*

@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         UnknownCheats OLED
-// @author       ryouzue
+// @author       aquaryuo
 // @description  OLED dark theme for unknowncheats.me, styled after sub.ryuo.to
 // @version      0.3.1
 // @match        https://*.unknowncheats.me/*

@@ -2,7 +2,7 @@
 // @name         Bilibili Fixes
 // @version      0.1.2
 // @description  Read the goddam name
-// @author       ryouzue
+// @author       aquaryuo
 // @match        https://*.bilibili.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=bilibili.com
 // @updateURL    https://raw.githubusercontent.com/aquaryuo/userscripts/main/bilibili.com/bilibili.user.js

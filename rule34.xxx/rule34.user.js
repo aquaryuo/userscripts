@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Dark Theme
-// @author       ryouzue
+// @author       aquaryuo
 // @description  A dark theme for a certain site
 // @version      0.1.11
 // @match        https://rule34.xxx/*

@@ -674,7 +674,7 @@ const kt_cd__t1 = mke('h2');
 kt_cd__t1.textContent = 'Site mod created by';
 const kt_cd__t2 = mke('a');
 kt_cd__t2.href = 'https://onish.dev/';
-kt_cd__t2.textContent = 'ryouzue';
+kt_cd__t2.textContent = 'aquaryuo';
 kt_cd__t2.target = '_blank';
 kt_cd__t2.rel = 'noopener';
 kt_cd.appendChild(kt_cd__t1);
