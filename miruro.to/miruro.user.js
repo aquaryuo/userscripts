@@ -2,14 +2,16 @@
 // @name         Miruro x ws.ryuo.to Sync
 // @author       aquaryuo
 // @description  Syncs watch progress between ws.ryuo.to and Miruro without logging in to AniList or MAL on Miruro
-// @version      0.1.1
+// @version      0.1.2
 // @match        https://ws.ryuo.to/*
 // @include      /^https:\/\/(www\.)?miruro\.[a-z]+\//
-// @icon         https://www.google.com/s2/favicons?sz=64&domain=miruro.to
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=miruro.cx
 // @updateURL    https://raw.githubusercontent.com/aquaryuo/userscripts/main/miruro.to/miruro.user.js
 // @downloadURL  https://raw.githubusercontent.com/aquaryuo/userscripts/main/miruro.to/miruro.user.js
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM_xmlhttpRequest
+// @connect      www.miruro.com
 // @run-at       document-start
 // @noframes
 // ==/UserScript==
@@ -27,6 +29,9 @@
   const SCHEMA = 7;
   const MAX_PAGES = 20;
   const SITE_EVERY = 5 * 60_000;
+  const LISTING = 'https://www.miruro.com/';
+  const KNOWN_DOMAINS = ['miruro.cx'];
+  const DOMAINS_EVERY = 24 * 3_600_000;
   const CHECK_EVERY = 30_000;
   const RETURN_GAP = 60_000;
   const ACTIVE_WITHIN = 2 * 60_000;
@@ -267,6 +272,7 @@
     .foot{display:flex}
     .open{text-decoration:none}
     .status span{display:block}
+    .tabs:empty,.list:empty{display:none}
   `;
 
   const WS_THEME = `
@@ -296,30 +302,30 @@
   `;
 
   const MIRURO_THEME = `
-    .dock{z-index:700;color:var(--text-primary,#e8e8e8);font:400 14px/1.45 var(--font-body,system-ui,sans-serif)}
+    .dock{--hover:color-mix(in srgb,currentColor 10%,transparent);z-index:700;color:var(--text-primary,#e8e8e8);font:400 14px/1.45 var(--font-body,system-ui,sans-serif)}
     .toggle{height:40px;padding:0 14px;border:1px solid var(--border-color,#f5f5f51a);border-radius:var(--radius,.5rem);background:var(--surface-panel,#141414);color:inherit}
-    .toggle:hover{background:var(--accent-overlay);color:var(--accent)}
+    .toggle:hover{background:var(--hover)}
     .toggle .label{font-size:13px;font-weight:600}
-    .pip{border-radius:50%;background:var(--accent,#b5a8ff)}
+    .pip{border-radius:50%;background:currentColor}
     .panel{overflow:hidden;border:1px solid var(--border-color,#f5f5f51a);border-radius:var(--radius,.5rem);background:var(--surface-panel-alt,#0e0e0e);box-shadow:0 8px 32px var(--shadow-color,#0009)}
     .head{padding:16px 16px 4px}
     .head .label{font-size:17px;font-weight:800}
     .head .pip{display:none}
     .head .chip{width:28px;height:28px;border:1px solid var(--border-color,#f5f5f51a);border-radius:var(--radius,.5rem);background:var(--surface-panel,#141414);color:inherit;font:inherit}
-    .head .chip:hover{background:var(--accent-overlay);color:var(--accent)}
+    .head .chip:hover{background:var(--hover)}
     .note{padding:4px 16px 0;color:var(--text-muted-strong,#a8a8a8);font-size:13.6px}
     .tabs{gap:4px;padding:12px 16px}
     .tabs .chip{padding:6px 10px;border:1px solid var(--border-color,#f5f5f51a);border-radius:var(--radius,.5rem);background:var(--surface-panel,#141414);color:inherit;font-family:inherit;font-size:12px;font-weight:500;line-height:1.2;text-transform:uppercase}
-    .tabs .chip:hover{color:var(--accent)}
-    .tabs .chip[aria-pressed=true]{background:var(--accent-overlay);color:var(--accent)}
+    .tabs .chip:hover{background:var(--hover)}
+    .tabs .chip[aria-pressed=true]{border-color:currentColor;background:var(--hover)}
     .list{scrollbar-color:var(--border-color,#f5f5f51a) transparent}
     .row{padding:8px 16px;color:inherit;font-size:13.6px}
-    .row:hover,.row:focus-visible{background:var(--accent-overlay-soft);color:var(--accent)}
+    .row:hover,.row:focus-visible{background:var(--hover)}
     .eps{color:var(--text-muted-strong,#a8a8a8);font-size:12px;line-height:20px;font-variant-numeric:tabular-nums}
     .foot{padding:12px 16px 16px}
     .open{flex:1;padding:10px;border:1px solid var(--border-color,#f5f5f51a);border-radius:var(--radius,.5rem);background:var(--surface-panel,#141414);color:inherit;font-size:14.4px;font-weight:600;text-align:center}
-    .open:hover{background:var(--accent-overlay);color:var(--accent)}
-    :focus-visible{outline:2px solid var(--accent,#b5a8ff);outline-offset:-2px}
+    .open:hover{background:var(--hover)}
+    :focus-visible{outline:2px solid currentColor;outline-offset:-2px}
   `;
 
   const WS_PLACE = {
@@ -327,7 +333,7 @@
     mark: 'Sync',
     title: 'Miruro sync',
     close: 'Esc',
-    other: [GM_getValue('miruro', 'https://www.miruro.to'), 'Open Miruro'],
+    other: [GM_getValue('miruro', 'https://www.miruro.cx'), 'Open Miruro'],
     link: (id) => `/anime/${id}`,
     copied: (when) => `Copied for Miruro ${when}.`,
     never: 'Nothing copied yet.',
@@ -497,6 +503,29 @@
     setInterval(badge, CHECK_EVERY);
     badge();
   };
+
+  const refreshDomains = () => {
+    if (Date.now() - GM_getValue('domainsAt', 0) < DOMAINS_EVERY) return;
+    GM_setValue('domainsAt', Date.now());
+    GM_xmlhttpRequest({
+      method: 'GET',
+      url: LISTING,
+      anonymous: true,
+      onload: ({ status, responseText }) => {
+        if (status !== 200) return;
+        const listed = [...responseText.matchAll(/href="https:\/\/(?:www\.)?(miruro\.[a-z]+)\/?"/g)]
+          .map((match) => match[1])
+          .filter((domain) => domain !== 'miruro.com');
+        GM_setValue('domains', [...new Set([...KNOWN_DOMAINS, ...listed])]);
+      },
+    });
+  };
+
+  if (!ON_SITE) {
+    refreshDomains();
+    const domains = GM_getValue('domains', KNOWN_DOMAINS);
+    if (!domains.includes(location.hostname.replace(/^www\./, ''))) return;
+  }
 
   const beat = () => GM_setValue(ON_SITE ? 'seenSite' : 'seenMiruro', Date.now());
   beat();

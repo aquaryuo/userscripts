@@ -6,8 +6,9 @@ import vm from 'node:vm';
 const source = readFileSync(new URL('./miruro.user.js', import.meta.url), 'utf8');
 const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 
-const boot = (hostname, gm, { store = new Map(), fetch, visibility = 'visible' } = {}) => {
+const boot = (hostname, gm, { store = new Map(), fetch, visibility = 'visible', listing } = {}) => {
   const timers = [];
+  const requests = [];
   const shown = [];
   const made = [];
   const listeners = [];
@@ -31,6 +32,10 @@ const boot = (hostname, gm, { store = new Map(), fetch, visibility = 'visible' }
   vm.runInNewContext(source, {
     GM_getValue: (k, d) => clone(gm[k] ?? d),
     GM_setValue: (k, v) => void (gm[k] = clone(v)),
+    GM_xmlhttpRequest: (request) => {
+      requests.push(request);
+      listing?.(request);
+    },
     localStorage: {
       getItem: (k) => store.get(k) ?? null,
       setItem: (k, v) => store.set(k, v),
@@ -48,6 +53,7 @@ const boot = (hostname, gm, { store = new Map(), fetch, visibility = 'visible' }
     store,
     shown,
     doc,
+    requests,
     tick: () => timers[0](),
     fire: () => Promise.all(listeners.filter(([type]) => type === 'visibilitychange').map(([, f]) => f())),
     texts: () => made.map((el) => el.textContent),
@@ -93,7 +99,7 @@ assert.ok(signedIn.texts().includes('Miruro: not opened yet'), 'Miruro has not r
 assert.equal(gm.snapshot.series[21].cover, 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21.jpg');
 assert.ok(gm.syncedAt);
 
-const miruro = boot('www.miruro.to', gm);
+const miruro = boot('www.miruro.cx', gm);
 const { history: seeded, recentVisits } = miruro.get('priver:watching');
 assert.equal(seeded[16498][0].progress_seconds, 300);
 assert.equal(miruro.get('priver:playback')['16498:12'].currentTime, '05:00');
@@ -116,7 +122,7 @@ assert.equal(gm.miruro, 'https://miruro.cx', 'the site panel links to the domain
 const removed = miruro.get('priver:watching');
 delete removed.history[21];
 miruro.store.set('priver:watching', JSON.stringify(removed));
-boot('www.miruro.to', gm, { store: miruro.store });
+boot('www.miruro.cx', gm, { store: miruro.store });
 assert.equal(miruro.get('priver:watching').history[16498].length, 1);
 assert.equal(miruro.get('priver:watching').history[21], undefined);
 
@@ -165,10 +171,10 @@ assert.deepEqual(Object.keys(gm.queue), ['h1_new:1']);
 assert.equal(signedOut.shown.length, 0, 'signed-out visitors never see the panel');
 
 gm.seenMiruro = now - 3 * 3_600_000;
-gm.miruro = 'https://www.miruro.tv';
+gm.miruro = 'https://www.miruro.cx';
 const status = boot('ws.ryuo.to', gm, { fetch: site() });
 await status.tick();
-assert.ok(status.texts().includes('Miruro (miruro.tv): last active 3 hours ago'), 'a sleeping site shows when it last ran');
+assert.ok(status.texts().includes('Miruro (miruro.cx): last active 3 hours ago'), 'a sleeping site shows when it last ran');
 
 const returning = [];
 const back = boot('ws.ryuo.to', gm, { visibility: 'hidden', fetch: site(returning) });
@@ -180,5 +186,32 @@ assert.ok(returning.length > 0, 'coming back to the tab syncs straight away');
 const afterReturn = returning.length;
 await back.fire();
 assert.equal(returning.length, afterReturn, 'switching back and forth does not sync again right away');
+
+for (const host of ['miruro.xyz', 'www.miruro.com', 'www.miruro.to', 'miruro.tv']) {
+  const outsider = { snapshot: gm.snapshot };
+  const page = boot(host, outsider);
+  assert.equal(page.get('priver:watching'), null, `${host} gets no watch history`);
+  assert.equal(outsider.miruro, undefined, `${host} is not remembered as Miruro`);
+  assert.equal(outsider.seenMiruro, undefined, `${host} does not count as Miruro being open`);
+}
+
+const listingPage = `
+  <a href="https://www.miruro.cx">primary</a>
+  <a href="https://miruro.si">new</a>
+  <a href="https://status.miruro.com/">status</a>
+  <a href="https://www.miruro.com/">home</a>
+  <a href="https://x.com/someone">miruro.evil</a>
+  <p>https://miruro.fake/</p>`;
+const listed = { snapshot: gm.snapshot };
+boot('miruro.si', listed, { listing: (request) => request.onload({ status: 200, responseText: listingPage }) });
+assert.deepEqual([...listed.domains].sort(), ['miruro.cx', 'miruro.si']);
+const newDomain = boot('www.miruro.si', listed);
+assert.ok(newDomain.get('priver:watching').history[16498], 'a newly listed domain works on its next load');
+assert.equal(newDomain.requests.length, 0, 'the listing is read at most once a day');
+
+const listingDown = { snapshot: gm.snapshot };
+const known = boot('www.miruro.cx', listingDown, { listing: (request) => request.onload({ status: 503, responseText: '' }) });
+assert.equal(listingDown.domains, undefined, 'a failed read changes nothing');
+assert.ok(known.get('priver:watching').history[16498], 'known domains work without the listing');
 
 console.log('miruro sync: all checks passed');

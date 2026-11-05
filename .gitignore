@@ -1,6 +1,7 @@
 # excluded from this repo (kept local)
 _utils/
 .run/
+tools/
 
 # never commit
 .env

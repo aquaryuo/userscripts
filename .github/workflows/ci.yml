@@ -14,7 +14,5 @@ jobs:
         run: |
           set -e
           for f in $(git ls-files '*.js'); do echo "check $f"; node --check "$f"; done
-      - name: Version sync
-        run: node tools/check-versions.mjs
       - name: Miruro sync behaviour
         run: node miruro.to/check.mjs
