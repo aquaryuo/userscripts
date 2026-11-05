@@ -21,6 +21,7 @@ If a click doesn't prompt an install, use the fallback: Tampermonkey **Dashboard
 | [`bilibili.com/`](bilibili.com/) | Bilibili Fixes | bilibili.com | 0.1.2 | Stable | [![Install](https://img.shields.io/badge/DOWNLOAD-3b82f6?style=for-the-badge&logo=tampermonkey&logoColor=white)](https://raw.githubusercontent.com/aquaryuo/userscripts/main/bilibili.com/bilibili.user.js) |
 | [`rule34.xxx/`](rule34.xxx/) | Dark Theme | rule34.xxx | 0.1.11 | Stable | [![Install](https://img.shields.io/badge/DOWNLOAD-3b82f6?style=for-the-badge&logo=tampermonkey&logoColor=white)](https://raw.githubusercontent.com/aquaryuo/userscripts/main/rule34.xxx/rule34.user.js) |
 | [`unknowncheats.me/`](unknowncheats.me/) | UnknownCheats OLED | unknowncheats.me | 0.3.1 | Stable | [![Install](https://img.shields.io/badge/DOWNLOAD-3b82f6?style=for-the-badge&logo=tampermonkey&logoColor=white)](https://raw.githubusercontent.com/aquaryuo/userscripts/main/unknowncheats.me/unknowncheats.user.js) |
+| [`miruro.to/`](miruro.to/) | ws.ryuo.to Sync | miruro.to + ws.ryuo.to | 0.1.0 | Unverified | [![Install](https://img.shields.io/badge/DOWNLOAD-3b82f6?style=for-the-badge&logo=tampermonkey&logoColor=white)](https://raw.githubusercontent.com/aquaryuo/userscripts/main/miruro.to/miruro.user.js) |
 | [`youtube.com/`](youtube.com/) | Palette seed | youtube.com | 0.1.5 | Seed | ![Seed](https://img.shields.io/badge/SEED-6b7280?style=for-the-badge) |
 | [`v3rmillion.rip/`](v3rmillion.rip/) | Dark Theme | ~~v3rmillion.rip~~ | 0.1.5 | Deprecated | ![Deprecated](https://img.shields.io/badge/DEPRECATED-6b7280?style=for-the-badge) |
 
@@ -33,6 +34,19 @@ archival.
 blacklist + URL linkifier) and has its own [README](kemono.su/README.md); the rest are
 primarily CSS themes.
 
+`miruro.to/` syncs watch progress between ws.ryuo.to and Miruro, for members who'd rather not log
+in to AniList or MAL on Miruro. It needs a ws.ryuo.to account. Data only moves while each site is
+open: ws.ryuo.to progress appears in Miruro's Watch History on Miruro's next page load, and Miruro
+progress reaches your account the next time you open ws.ryuo.to, so an outage only delays it. A
+small button on each site, styled to match that site, opens your full list and shows what's still
+waiting.
+
+Miruro's own code looks up synced series by AniList ID, so its API sees which series you've synced.
+The script treats one browser profile as one member. The first sync reads the newest 20 pages of
+your ws.ryuo.to history, so older episodes only appear if you rewatch them, and anything watched on
+Miruro before you installed the script stays on Miruro. Run `node miruro.to/check.mjs` after
+changing it.
+
 Assets for each script live in that folder's `_icons/`. Most loaders (`*.user.js`) pull their
-behavior/theme from this repo via `@require` (unknowncheats is self-contained inline). All active
+behavior/theme from this repo via `@require` (unknowncheats and miruro are self-contained). All active
 scripts self-update through GitHub raw, so pushing here publishes the update.
