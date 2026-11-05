@@ -6,15 +6,28 @@ import vm from 'node:vm';
 const source = readFileSync(new URL('./miruro.user.js', import.meta.url), 'utf8');
 const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 
-const boot = (hostname, gm, { store = new Map(), fetch } = {}) => {
+const boot = (hostname, gm, { store = new Map(), fetch, visibility = 'visible' } = {}) => {
   const timers = [];
   const shown = [];
-  const element = () => ({
-    append() {},
-    setAttribute() {},
-    replaceChildren() {},
-    attachShadow: element,
-  });
+  const made = [];
+  const listeners = [];
+  const element = () => {
+    const el = {
+      append() {},
+      setAttribute() {},
+      replaceChildren() {},
+      attachShadow: element,
+    };
+    made.push(el);
+    return el;
+  };
+  const doc = {
+    readyState: 'loading',
+    visibilityState: visibility,
+    addEventListener: (type, f) => listeners.push([type, f]),
+    createElement: element,
+    body: { append: (el) => shown.push(el) },
+  };
   vm.runInNewContext(source, {
     GM_getValue: (k, d) => clone(gm[k] ?? d),
     GM_setValue: (k, v) => void (gm[k] = clone(v)),
@@ -22,14 +35,8 @@ const boot = (hostname, gm, { store = new Map(), fetch } = {}) => {
       getItem: (k) => store.get(k) ?? null,
       setItem: (k, v) => store.set(k, v),
     },
-    location: { hostname },
-    document: {
-      readyState: 'loading',
-      visibilityState: 'visible',
-      addEventListener() {},
-      createElement: element,
-      body: { append: (el) => shown.push(el) },
-    },
+    location: { hostname, origin: `https://${hostname}` },
+    document: doc,
     addEventListener() {},
     setTimeout: (f) => timers.push(f),
     setInterval: (f) => timers.push(f),
@@ -37,7 +44,15 @@ const boot = (hostname, gm, { store = new Map(), fetch } = {}) => {
     console,
     URL,
   });
-  return { store, shown, tick: () => timers[0](), get: (k) => JSON.parse(store.get(k) ?? 'null') };
+  return {
+    store,
+    shown,
+    doc,
+    tick: () => timers[0](),
+    fire: () => Promise.all(listeners.filter(([type]) => type === 'visibilitychange').map(([, f]) => f())),
+    texts: () => made.map((el) => el.textContent),
+    get: (k) => JSON.parse(store.get(k) ?? 'null'),
+  };
 };
 
 const now = Date.now();
@@ -73,6 +88,8 @@ const gm = {};
 const signedIn = boot('ws.ryuo.to', gm, { fetch: site() });
 await signedIn.tick();
 assert.equal(signedIn.shown.length, 1, 'the panel appears after a sync that worked');
+assert.ok(signedIn.texts().includes('ws.ryuo.to: open now'), 'this site shows as open');
+assert.ok(signedIn.texts().includes('Miruro: not opened yet'), 'Miruro has not run yet');
 assert.equal(gm.snapshot.series[21].cover, 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21.jpg');
 assert.ok(gm.syncedAt);
 
@@ -85,6 +102,16 @@ assert.equal(seeded[5114], undefined, 'finished titles stay out of Watch History
 assert.equal(seeded[1], undefined, 'planned titles have nothing to resume');
 assert.match(recentVisits[16498].bannerImage, /^https:\/\/s4\.anilist\.co\//);
 assert.ok(Date.parse(seeded[9253][0].updated_at) <= Date.now(), 'a fast server clock is clamped');
+
+const include = new RegExp(source.match(/@include\s+\/(.+)\/$/m)[1]);
+for (const host of ['miruro.to', 'www.miruro.to', 'miruro.tv', 'www.miruro.tv', 'miruro.cx', 'www.miruro.cx'])
+  assert.ok(include.test(`https://${host}/watch`), `${host} should match`);
+for (const host of ['miruro.to.example.com', 'notmiruro.to', 'ws.ryuo.to'])
+  assert.ok(!include.test(`https://${host}/`), `${host} should not match`);
+
+const otherDomain = boot('miruro.cx', gm);
+assert.equal(otherDomain.get('priver:watching').history[16498][0].progress_seconds, 300, 'each Miruro domain seeds its own storage');
+assert.equal(gm.miruro, 'https://miruro.cx', 'the site panel links to the domain last used');
 
 const removed = miruro.get('priver:watching');
 delete removed.history[21];
@@ -136,5 +163,22 @@ const signedOut = boot('ws.ryuo.to', gm, { fetch: async () => new Response('{}',
 await signedOut.tick();
 assert.deepEqual(Object.keys(gm.queue), ['h1_new:1']);
 assert.equal(signedOut.shown.length, 0, 'signed-out visitors never see the panel');
+
+gm.seenMiruro = now - 3 * 3_600_000;
+gm.miruro = 'https://www.miruro.tv';
+const status = boot('ws.ryuo.to', gm, { fetch: site() });
+await status.tick();
+assert.ok(status.texts().includes('Miruro (miruro.tv): last active 3 hours ago'), 'a sleeping site shows when it last ran');
+
+const returning = [];
+const back = boot('ws.ryuo.to', gm, { visibility: 'hidden', fetch: site(returning) });
+await back.tick();
+assert.equal(returning.length, 0, 'a hidden tab makes no requests');
+back.doc.visibilityState = 'visible';
+await back.fire();
+assert.ok(returning.length > 0, 'coming back to the tab syncs straight away');
+const afterReturn = returning.length;
+await back.fire();
+assert.equal(returning.length, afterReturn, 'switching back and forth does not sync again right away');
 
 console.log('miruro sync: all checks passed');

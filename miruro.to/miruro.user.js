@@ -2,10 +2,9 @@
 // @name         Miruro x ws.ryuo.to Sync
 // @author       aquaryuo
 // @description  Syncs watch progress between ws.ryuo.to and Miruro without logging in to AniList or MAL on Miruro
-// @version      0.1.0
+// @version      0.1.1
 // @match        https://ws.ryuo.to/*
-// @match        https://www.miruro.to/*
-// @match        https://miruro.to/*
+// @include      /^https:\/\/(www\.)?miruro\.[a-z]+\//
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=miruro.to
 // @updateURL    https://raw.githubusercontent.com/aquaryuo/userscripts/main/miruro.to/miruro.user.js
 // @downloadURL  https://raw.githubusercontent.com/aquaryuo/userscripts/main/miruro.to/miruro.user.js
@@ -28,7 +27,9 @@
   const SCHEMA = 7;
   const MAX_PAGES = 20;
   const SITE_EVERY = 5 * 60_000;
-  const MIRURO_EVERY = 30_000;
+  const CHECK_EVERY = 30_000;
+  const RETURN_GAP = 60_000;
+  const ACTIVE_WITHIN = 2 * 60_000;
   const ASSUMED_LENGTH = 1440;
   const STATUSES = ['watching', 'rewatching', 'planning', 'paused', 'completed', 'dropped'];
   const FINISHED = ['completed', 'dropped'];
@@ -117,16 +118,23 @@
   };
 
   let mounted = false;
-  const sync = () =>
-    document.visibilityState === 'visible'
-      ? flush()
-          .then(pull)
-          .then(() => {
-            if (!mounted) mount(true);
-            mounted = true;
-          })
-          .catch((err) => console.debug('ws sync:', err.message))
-      : undefined;
+  let syncing = false;
+  let lastSync = 0;
+  const sync = () => {
+    if (document.visibilityState !== 'visible' || syncing) return undefined;
+    syncing = true;
+    lastSync = Date.now();
+    return flush()
+      .then(pull)
+      .then(() => {
+        if (!mounted) mount(true);
+        mounted = true;
+      })
+      .catch((err) => console.debug('ws sync:', err.message))
+      .finally(() => {
+        syncing = false;
+      });
+  };
 
   const read = (key) => {
     try {
@@ -258,6 +266,7 @@
     .eps{flex:none}
     .foot{display:flex}
     .open{text-decoration:none}
+    .status span{display:block}
   `;
 
   const WS_THEME = `
@@ -318,7 +327,7 @@
     mark: 'Sync',
     title: 'Miruro sync',
     close: 'Esc',
-    other: ['https://www.miruro.to', 'Open Miruro'],
+    other: [GM_getValue('miruro', 'https://www.miruro.to'), 'Open Miruro'],
     link: (id) => `/anime/${id}`,
     copied: (when) => `Copied for Miruro ${when}.`,
     never: 'Nothing copied yet.',
@@ -348,9 +357,20 @@
   const ago = (time) => {
     const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
     const minutes = Math.round((time - Date.now()) / 60_000);
+    if (minutes === 0) return 'just now';
     if (minutes > -60) return rtf.format(minutes, 'minute');
     if (minutes > -1440) return rtf.format(Math.round(minutes / 60), 'hour');
     return rtf.format(Math.round(minutes / 1440), 'day');
+  };
+
+  const activity = (name, seen) => {
+    if (!seen) return `${name}: not opened yet`;
+    return Date.now() - seen < ACTIVE_WITHIN ? `${name}: open now` : `${name}: last active ${ago(seen)}`;
+  };
+
+  const miruroName = () => {
+    const origin = GM_getValue('miruro');
+    return origin ? `Miruro (${new URL(origin).hostname.replace(/^www\./, '')})` : 'Miruro';
   };
 
   const mount = (current) => {
@@ -363,10 +383,14 @@
       h('div', { className: 'dock' }, panel, toggle)
     );
 
+    const siteStatus = h('span');
+    const miruroStatus = h('span');
     let tab = null;
 
     const badge = () => {
       if (!host.isConnected) document.body.append(host);
+      siteStatus.textContent = activity('ws.ryuo.to', GM_getValue('seenSite'));
+      miruroStatus.textContent = activity(miruroName(), GM_getValue('seenMiruro'));
       const waiting = Object.keys(GM_getValue('queue', {})).length;
       toggle.setAttribute('aria-expanded', String(!panel.hidden));
       toggle.setAttribute('aria-label', `${place.title}, ${waiting} waiting`);
@@ -434,6 +458,7 @@
           textContent: syncedAt ? place.copied(ago(syncedAt)) : place.never,
         }),
         h('p', { className: 'note', textContent: waiting ? place.waiting(waiting) : place.clear }),
+        h('div', { className: 'note status' }, siteStatus, miruroStatus),
         ...(current
           ? []
           : [
@@ -469,20 +494,30 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && !panel.hidden) show(false);
     });
-    setInterval(badge, MIRURO_EVERY);
+    setInterval(badge, CHECK_EVERY);
     badge();
   };
 
+  const beat = () => GM_setValue(ON_SITE ? 'seenSite' : 'seenMiruro', Date.now());
+  beat();
+
   if (ON_SITE) {
-    setTimeout(sync, 5000);
+    setTimeout(() => {
+      document.addEventListener('visibilitychange', () =>
+        Date.now() - lastSync > RETURN_GAP ? sync() : undefined
+      );
+      return sync();
+    }, 5000);
     setInterval(sync, SITE_EVERY);
   } else {
+    GM_setValue('miruro', location.origin);
     scan();
     const current = apply();
-    setInterval(scan, MIRURO_EVERY);
+    setInterval(scan, CHECK_EVERY);
     addEventListener('pagehide', scan);
     if (document.readyState === 'loading')
       document.addEventListener('DOMContentLoaded', () => mount(current));
     else mount(current);
   }
+  setInterval(beat, CHECK_EVERY);
 })();
