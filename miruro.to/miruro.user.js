@@ -2,7 +2,7 @@
 // @name         Miruro x ws.ryuo.to Sync
 // @author       aquaryuo
 // @description  Syncs watch progress between ws.ryuo.to and Miruro without logging in to AniList or MAL on Miruro
-// @version      0.1.3
+// @version      0.1.4
 // @match        https://ws.ryuo.to/*
 // @include      /^https:\/\/(www\.)?miruro\.[a-z]+\//
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=miruro.cx
@@ -26,8 +26,9 @@
   const PLAYBACK = 'priver:playback';
   const HERMES_WATCHING = 'hermes:watching';
   const HERMES_PLAYBACK = 'hermes:playback';
+  const HERMES_SETTINGS = 'miruro:watching';
   const HERMES_APP = !ON_SITE && !location.hostname.startsWith('www.');
-  const LOOKUP_SIZE = 25;
+  const LOOKUP_SIZE = 50;
   const HISTORY_LIMIT = 100;
   const QUERIES = 'miruro:cache:query-v2';
   const MARKS = 'ws-sync';
@@ -226,26 +227,36 @@
     return true;
   };
 
-  const localProgress = () => [
-    ...Object.entries(read(WATCHING).history ?? {}).flatMap(([h, episodes]) =>
-      Array.isArray(episodes)
-        ? episodes.map((x) => ({
-            h,
-            e: x.episode_number,
-            p: x.progress_seconds,
-            d: x.duration_seconds,
-            t: Date.parse(x.updated_at),
-          }))
-        : []
-    ),
-    ...Object.entries(read(HERMES_WATCHING).history ?? {}).map(([h, x]) => ({
-      h,
-      e: x.episodeNumber,
-      p: x.positionSeconds,
-      d: x.durationSeconds,
-      t: x.lastViewed,
-    })),
-  ];
+  const localProgress = () => {
+    const hermes = read(HERMES_WATCHING).history ?? {};
+    return [
+      ...Object.entries(read(WATCHING).history ?? {}).flatMap(([h, episodes]) =>
+        Array.isArray(episodes)
+          ? episodes.map((x) => ({
+              h,
+              e: x.episode_number,
+              p: x.progress_seconds,
+              d: x.duration_seconds,
+              t: Date.parse(x.updated_at),
+            }))
+          : []
+      ),
+      ...Object.entries(hermes).map(([h, x]) => ({
+        h,
+        e: x.episodeNumber,
+        p: x.positionSeconds,
+        d: x.durationSeconds,
+        t: x.lastViewed,
+      })),
+      ...Object.entries(read(HERMES_PLAYBACK)).flatMap(([key, x]) => {
+        const cut = key.lastIndexOf(':');
+        const h = key.slice(0, cut);
+        return hermes[h]
+          ? [{ h, e: Number(key.slice(cut + 1)), p: x.currentTime, d: x.duration, t: x.lastUpdated }]
+          : [];
+      }),
+    ];
+  };
 
   const scan = () => {
     const ids = GM_getValue('ids', {});
@@ -260,6 +271,7 @@
     GM_setValue('ids', ids);
 
     const marks = read(MARKS);
+    if (read(HERMES_SETTINGS).historyPaused) return write(MARKS, { ...marks, exported: Date.now() });
     const since = marks.exported ?? Infinity;
     const queue = GM_getValue('queue', {});
     const { rows = {} } = GM_getValue('snapshot', {});
@@ -303,7 +315,6 @@
       for (const a of batch) {
         const found = data[animeIds[a]];
         if (found) known[a] = { m: found.anime_id, h: found.history_id };
-        else if (!browse.has_more) known[a] = 0;
       }
     }
     GM_setValue('catalog', known);
@@ -311,7 +322,9 @@
   };
 
   const applyHermes = async () => {
-    const since = read(MARKS).hermes ?? 0;
+    const start = read(MARKS);
+    if (start.exported === undefined) write(MARKS, { ...start, exported: Date.now() });
+    const since = start.hermes ?? 0;
     const newest = new Map();
     let top = since;
     pending(since, (id, episode, position, duration, time) => {
@@ -363,7 +376,7 @@
       write(HERMES_PLAYBACK, playback);
     }
     const marks = read(MARKS);
-    write(MARKS, { ...marks, hermes: top, exported: Math.max(marks.exported ?? now, added) });
+    write(MARKS, { ...marks, hermes: top, exported: Math.max(marks.exported, added) });
     if (added) dispatchEvent(new Event('focus'));
   };
 

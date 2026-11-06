@@ -130,7 +130,9 @@ const historyId = (id) => `h1_${animeId(id)}`;
 const miruroApi = (log = []) => async (path, init) => {
   log.push(path);
   if (path.startsWith('/api/search/browse')) {
-    const wanted = new URL(path, 'https://x').searchParams.get('anilist_id_in').split(',');
+    const query = new URL(path, 'https://x').searchParams;
+    if (query.get('limit') !== '50') return new Response('', { status: 400 });
+    const wanted = query.get('anilist_id_in').split(',');
     return Response.json({
       data: wanted.filter((id) => id !== '9253').map((id) => ({ id: animeId(id), external_ids: { anilist: [id] } })),
       has_more: false,
@@ -160,6 +162,7 @@ assert.equal(bare.get('hermes:playback')[`${historyId(16498)}:12`].currentTime, 
 assert.equal(bareHistory[historyId(21)].episodeNumber, 40, 'library-only titles use their episode count');
 assert.equal(bareHistory[historyId(5114)], undefined, 'finished titles stay out of Continue Watching');
 assert.equal(bareHistory[historyId(9253)], undefined, 'titles Miruro does not have are skipped');
+assert.equal(bareGm.catalog[9253], undefined, 'a title Miruro does not have yet is looked up again next time');
 assert.equal(bare.get('priver:watching'), null, "miruro.cx does not get the www app's history");
 assert.equal(bare.focused(), 1, 'the app is told to read its history again');
 assert.equal(bareGm.miruro, 'https://miruro.cx', 'the site panel links to the domain last used');
@@ -188,6 +191,21 @@ assert.deepEqual(Object.keys(bareGm.queue), [`${historyId(16498)}:13`], 'progres
 assert.equal(bareGm.queue[`${historyId(16498)}:13`].p, 600);
 assert.equal(bareGm.ids[historyId(16498)], 16498, 'its AniList ID comes from the history entry');
 
+bareAgain.store.set('miruro:watching', JSON.stringify({ historyPaused: true }));
+bareAgain.store.set('hermes:playback', JSON.stringify({ [`${historyId(16498)}:11`]: { currentTime: 900, duration: 1440, lastUpdated: Date.now() } }));
+await bareAgain.tick();
+bareAgain.store.set('miruro:watching', JSON.stringify({ historyPaused: false }));
+await bareAgain.tick();
+assert.equal(bareGm.queue[`${historyId(16498)}:11`], undefined, 'nothing watched while Miruro history is paused goes out');
+
+bareAgain.store.set('hermes:playback', JSON.stringify({
+  [`${historyId(16498)}:12`]: { currentTime: 1400, duration: 1440, lastUpdated: Date.now() + 5000 },
+  [`${historyId(777)}:1`]: { currentTime: 100, duration: 1440, lastUpdated: Date.now() + 5000 },
+}));
+await bareAgain.tick();
+assert.equal(bareGm.queue[`${historyId(16498)}:12`].p, 1400, "an episode's last position survives moving to the next one");
+assert.equal(bareGm.queue[`${historyId(777)}:1`], undefined, 'playback with no history entry is ignored');
+
 const newerGm = { snapshot: gm.snapshot };
 const newerStore = new Map([
   ['hermes:watching', JSON.stringify({ history: { [historyId(16498)]: { mediaId: animeId(16498), historyId: historyId(16498), title: 'Local', episodeNumber: 20, positionSeconds: 5, durationSeconds: 10, lastViewed: Date.now() + 60_000, watchedEpisodes: [20] } } })],
@@ -200,7 +218,11 @@ const downGm = { snapshot: gm.snapshot };
 const apiDown = boot('miruro.cx', downGm, { fetch: async () => new Response('', { status: 403 }) });
 await settle();
 assert.equal(apiDown.get('hermes:watching'), null);
-assert.equal(apiDown.get('ws-sync'), null, 'a failed lookup leaves everything to try again');
+assert.equal(apiDown.get('ws-sync').hermes, undefined, 'a failed lookup leaves the import to try again');
+apiDown.store.set('hermes:watching', JSON.stringify({ history: { [historyId(16498)]: { mediaId: animeId(16498), historyId: historyId(16498), episodeNumber: 3, positionSeconds: 100, durationSeconds: 1440, lastViewed: Date.now() + 1000, externalIds: { anilist: ['16498'] } } } }));
+await apiDown.tick();
+assert.equal(downGm.queue[`${historyId(16498)}:3`].p, 100, 'a failed lookup does not stop progress reaching the account');
+apiDown.store.delete('hermes:watching');
 const backUp = boot('miruro.cx', downGm, { store: apiDown.store, fetch: miruroApi() });
 await settle();
 assert.ok(backUp.get('hermes:watching').history[historyId(16498)], 'the next page load catches up');
