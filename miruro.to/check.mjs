@@ -12,6 +12,7 @@ const boot = (hostname, gm, { store = new Map(), fetch, visibility = 'visible', 
   const shown = [];
   const made = [];
   const listeners = [];
+  let focused = 0;
   const element = () => {
     const el = {
       append() {},
@@ -43,6 +44,10 @@ const boot = (hostname, gm, { store = new Map(), fetch, visibility = 'visible', 
     location: { hostname, origin: `https://${hostname}` },
     document: doc,
     addEventListener() {},
+    dispatchEvent: () => {
+      focused++;
+    },
+    Event: class {},
     setTimeout: (f) => timers.push(f),
     setInterval: (f) => timers.push(f),
     fetch,
@@ -55,12 +60,14 @@ const boot = (hostname, gm, { store = new Map(), fetch, visibility = 'visible', 
     doc,
     requests,
     tick: () => timers[0](),
+    focused: () => focused,
     fire: () => Promise.all(listeners.filter(([type]) => type === 'visibilitychange').map(([, f]) => f())),
     texts: () => made.map((el) => el.textContent),
     get: (k) => JSON.parse(store.get(k) ?? 'null'),
   };
 };
 
+const settle = () => new Promise((resolve) => setImmediate(resolve));
 const now = Date.now();
 const media = (id, name) => ({
   id,
@@ -115,9 +122,93 @@ for (const host of ['miruro.to', 'www.miruro.to', 'miruro.tv', 'www.miruro.tv', 
 for (const host of ['miruro.to.example.com', 'notmiruro.to', 'ws.ryuo.to'])
   assert.ok(!include.test(`https://${host}/`), `${host} should not match`);
 
-const otherDomain = boot('miruro.cx', gm);
+const otherDomain = boot('www.miruro.cx', gm);
 assert.equal(otherDomain.get('priver:watching').history[16498][0].progress_seconds, 300, 'each Miruro domain seeds its own storage');
-assert.equal(gm.miruro, 'https://miruro.cx', 'the site panel links to the domain last used');
+
+const animeId = (id) => `anime${id}`.padEnd(32, '_');
+const historyId = (id) => `h1_${animeId(id)}`;
+const miruroApi = (log = []) => async (path, init) => {
+  log.push(path);
+  if (path.startsWith('/api/search/browse')) {
+    const wanted = new URL(path, 'https://x').searchParams.get('anilist_id_in').split(',');
+    return Response.json({
+      data: wanted.filter((id) => id !== '9253').map((id) => ({ id: animeId(id), external_ids: { anilist: [id] } })),
+      has_more: false,
+    });
+  }
+  const { ids } = JSON.parse(init.body);
+  return Response.json({
+    identity_version: 'v',
+    data: Object.fromEntries(ids.map((id) => [id, { anime_id: id, history_id: `h1_${id}` }])),
+  });
+};
+
+const bareGm = { snapshot: gm.snapshot };
+const bareLog = [];
+const bare = boot('miruro.cx', bareGm, { fetch: miruroApi(bareLog) });
+await settle();
+const bareHistory = bare.get('hermes:watching').history;
+const aot = bareHistory[historyId(16498)];
+assert.equal(aot.mediaId, animeId(16498), 'miruro.cx needs its own anime ID');
+assert.equal(aot.historyId, historyId(16498));
+assert.equal(aot.title, 'Attack on Titan');
+assert.equal(aot.episodeNumber, 12, 'miruro.cx keeps the newest episode of each series');
+assert.equal(aot.positionSeconds, 300);
+assert.equal(aot.durationSeconds, 1440);
+assert.deepEqual(aot.externalIds.anilist, ['16498']);
+assert.equal(bare.get('hermes:playback')[`${historyId(16498)}:12`].currentTime, 300, 'miruro.cx stores seconds');
+assert.equal(bareHistory[historyId(21)].episodeNumber, 40, 'library-only titles use their episode count');
+assert.equal(bareHistory[historyId(5114)], undefined, 'finished titles stay out of Continue Watching');
+assert.equal(bareHistory[historyId(9253)], undefined, 'titles Miruro does not have are skipped');
+assert.equal(bare.get('priver:watching'), null, "miruro.cx does not get the www app's history");
+assert.equal(bare.focused(), 1, 'the app is told to read its history again');
+assert.equal(bareGm.miruro, 'https://miruro.cx', 'the site panel links to the domain last used');
+assert.equal(bareLog.length, 2, 'a lookup takes one browse and one identities call');
+
+const removedHere = bare.get('hermes:watching');
+delete removedHere.history[historyId(21)];
+bare.store.set('hermes:watching', JSON.stringify(removedHere));
+const bareAgain = boot('miruro.cx', bareGm, { store: bare.store, fetch: miruroApi(bareLog) });
+await settle();
+assert.equal(bareAgain.get('hermes:watching').history[historyId(21)], undefined, 'a removed title stays removed');
+assert.equal(bareLog.length, 2, 'looked-up IDs are remembered');
+assert.equal(bareAgain.focused(), 0, 'nothing new means no refresh');
+
+const moved = bareAgain.get('hermes:watching');
+Object.assign(moved.history[historyId(16498)], {
+  episodeNumber: 13,
+  positionSeconds: 600,
+  durationSeconds: 1440,
+  lastViewed: Date.now() + 1000,
+  externalIds: { anilist: ['16498'], mal: ['16498'] },
+});
+bareAgain.store.set('hermes:watching', JSON.stringify(moved));
+await bareAgain.tick();
+assert.deepEqual(Object.keys(bareGm.queue), [`${historyId(16498)}:13`], 'progress on miruro.cx is queued for the account');
+assert.equal(bareGm.queue[`${historyId(16498)}:13`].p, 600);
+assert.equal(bareGm.ids[historyId(16498)], 16498, 'its AniList ID comes from the history entry');
+
+const newerGm = { snapshot: gm.snapshot };
+const newerStore = new Map([
+  ['hermes:watching', JSON.stringify({ history: { [historyId(16498)]: { mediaId: animeId(16498), historyId: historyId(16498), title: 'Local', episodeNumber: 20, positionSeconds: 5, durationSeconds: 10, lastViewed: Date.now() + 60_000, watchedEpisodes: [20] } } })],
+]);
+const newer = boot('miruro.cx', newerGm, { store: newerStore, fetch: miruroApi() });
+await settle();
+assert.equal(newer.get('hermes:watching').history[historyId(16498)].episodeNumber, 20, 'newer local progress is kept');
+
+const downGm = { snapshot: gm.snapshot };
+const apiDown = boot('miruro.cx', downGm, { fetch: async () => new Response('', { status: 403 }) });
+await settle();
+assert.equal(apiDown.get('hermes:watching'), null);
+assert.equal(apiDown.get('ws-sync'), null, 'a failed lookup leaves everything to try again');
+const backUp = boot('miruro.cx', downGm, { store: apiDown.store, fetch: miruroApi() });
+await settle();
+assert.ok(backUp.get('hermes:watching').history[historyId(16498)], 'the next page load catches up');
+
+const wwwApp = boot('www.miruro.cx', { snapshot: gm.snapshot });
+assert.equal(wwwApp.get('hermes:watching'), null, 'www.miruro.cx stays on its own storage');
+assert.ok(wwwApp.get('priver:watching').history[16498]);
+
 
 const removed = miruro.get('priver:watching');
 delete removed.history[21];

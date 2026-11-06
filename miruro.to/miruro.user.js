@@ -2,7 +2,7 @@
 // @name         Miruro x ws.ryuo.to Sync
 // @author       aquaryuo
 // @description  Syncs watch progress between ws.ryuo.to and Miruro without logging in to AniList or MAL on Miruro
-// @version      0.1.2
+// @version      0.1.3
 // @match        https://ws.ryuo.to/*
 // @include      /^https:\/\/(www\.)?miruro\.[a-z]+\//
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=miruro.cx
@@ -24,6 +24,11 @@
   const CDN = 'https://s4.anilist.co/file/anilistcdn/';
   const WATCHING = 'priver:watching';
   const PLAYBACK = 'priver:playback';
+  const HERMES_WATCHING = 'hermes:watching';
+  const HERMES_PLAYBACK = 'hermes:playback';
+  const HERMES_APP = !ON_SITE && !location.hostname.startsWith('www.');
+  const LOOKUP_SIZE = 25;
+  const HISTORY_LIMIT = 100;
   const QUERIES = 'miruro:cache:query-v2';
   const MARKS = 'ws-sync';
   const SCHEMA = 7;
@@ -157,12 +162,24 @@
     return hours ? `${hours}:${rest}` : rest;
   };
 
+  const pending = (since, add) => {
+    const { rows = {}, series = {} } = GM_getValue('snapshot', {});
+    for (const r of Object.values(rows))
+      if (r.t > since && !FINISHED.includes(series[r.a]?.status)) add(r.a, r.e, r.p, r.d, r.t);
+
+    const played = new Set(Object.values(rows).map((r) => String(r.a)));
+    for (const [id, s] of Object.entries(series))
+      if (s.at > since && s.watched > 0 && !played.has(id))
+        if (['watching', 'rewatching', 'paused'].includes(s.status))
+          add(id, s.watched, ASSUMED_LENGTH, ASSUMED_LENGTH, s.at);
+  };
+
   const apply = () => {
     const watching = read(WATCHING);
     if (watching.schemaVersion > SCHEMA) return false;
     if (document.readyState !== 'loading') return true;
 
-    const { rows = {}, series = {} } = GM_getValue('snapshot', {});
+    const { series = {} } = GM_getValue('snapshot', {});
     const marks = read(MARKS);
     const since = marks.applied ?? 0;
     const now = Date.now();
@@ -199,14 +216,7 @@
       applied = Math.max(applied, time);
     };
 
-    for (const r of Object.values(rows))
-      if (r.t > since && !FINISHED.includes(series[r.a]?.status)) add(r.a, r.e, r.p, r.d, r.t);
-
-    const played = new Set(Object.values(rows).map((r) => String(r.a)));
-    for (const [id, s] of Object.entries(series))
-      if (s.at > since && s.watched > 0 && !played.has(id))
-        if (['watching', 'rewatching', 'paused'].includes(s.status))
-          add(id, s.watched, ASSUMED_LENGTH, ASSUMED_LENGTH, s.at);
+    pending(since, add);
 
     if (applied > since) {
       write(WATCHING, watching);
@@ -216,6 +226,27 @@
     return true;
   };
 
+  const localProgress = () => [
+    ...Object.entries(read(WATCHING).history ?? {}).flatMap(([h, episodes]) =>
+      Array.isArray(episodes)
+        ? episodes.map((x) => ({
+            h,
+            e: x.episode_number,
+            p: x.progress_seconds,
+            d: x.duration_seconds,
+            t: Date.parse(x.updated_at),
+          }))
+        : []
+    ),
+    ...Object.entries(read(HERMES_WATCHING).history ?? {}).map(([h, x]) => ({
+      h,
+      e: x.episodeNumber,
+      p: x.positionSeconds,
+      d: x.durationSeconds,
+      t: x.lastViewed,
+    })),
+  ];
+
   const scan = () => {
     const ids = GM_getValue('ids', {});
     for (const { queryKey, state } of read(QUERIES).clientState?.queries ?? []) {
@@ -224,6 +255,8 @@
       const anilist = d.external_ids?.anilist ?? [];
       ids[d.history_id] = anilist.length === 1 ? Number(anilist[0]) : 0;
     }
+    for (const [h, { externalIds }] of Object.entries(read(HERMES_WATCHING).history ?? {}))
+      if (externalIds) ids[h] = externalIds.anilist?.length === 1 ? Number(externalIds.anilist[0]) : 0;
     GM_setValue('ids', ids);
 
     const marks = read(MARKS);
@@ -231,26 +264,118 @@
     const queue = GM_getValue('queue', {});
     const { rows = {} } = GM_getValue('snapshot', {});
     let top = since;
-    for (const [h, episodes] of Object.entries(read(WATCHING).history ?? {})) {
-      if (!Array.isArray(episodes)) continue;
-      for (const x of episodes) {
-        const t = Date.parse(x.updated_at);
-        if (!(t > since)) continue;
-        top = Math.max(top, t);
-        if (!(x.duration_seconds > 0)) continue;
-        if (rows[`${ids[h]}:${x.episode_number}`]?.p >= x.progress_seconds) continue;
-        queue[`${h}:${x.episode_number}`] = {
-          h,
-          e: x.episode_number,
-          p: x.progress_seconds,
-          d: x.duration_seconds,
-          t,
-        };
-      }
+    for (const x of localProgress()) {
+      if (!(x.t > since)) continue;
+      top = Math.max(top, x.t);
+      if (!(x.d > 0)) continue;
+      if (rows[`${ids[x.h]}:${x.e}`]?.p >= x.p) continue;
+      queue[`${x.h}:${x.e}`] = x;
     }
     if (top === since) return;
     GM_setValue('queue', queue);
     write(MARKS, { ...marks, exported: top });
+  };
+
+  const miruroJson = async (path, init) => {
+    const res = await fetch(path, init);
+    if (!res.ok) throw new Error(String(res.status));
+    return res.json();
+  };
+
+  const lookUp = async (anilistIds) => {
+    const known = GM_getValue('catalog', {});
+    const missing = anilistIds.filter((id) => known[id] === undefined);
+    for (let i = 0; i < missing.length; i += LOOKUP_SIZE) {
+      const batch = missing.slice(i, i + LOOKUP_SIZE);
+      const browse = await miruroJson(`/api/search/browse?anilist_id_in=${batch}&limit=${LOOKUP_SIZE}`);
+      const animeIds = {};
+      for (const { id, external_ids: external } of browse.data)
+        for (const a of external.anilist ?? [])
+          animeIds[a] = animeIds[a] === undefined || animeIds[a] === id ? id : null;
+      const wanted = Object.values(animeIds).filter(Boolean);
+      const { data = {} } = wanted.length
+        ? await miruroJson('/api/v1/identities', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ ids: wanted }),
+          })
+        : {};
+      for (const a of batch) {
+        const found = data[animeIds[a]];
+        if (found) known[a] = { m: found.anime_id, h: found.history_id };
+        else if (!browse.has_more) known[a] = 0;
+      }
+    }
+    GM_setValue('catalog', known);
+    return known;
+  };
+
+  const applyHermes = async () => {
+    const since = read(MARKS).hermes ?? 0;
+    const newest = new Map();
+    let top = since;
+    pending(since, (id, episode, position, duration, time) => {
+      top = Math.max(top, time);
+      if (!(newest.get(String(id))?.time >= time)) newest.set(String(id), { episode, position, duration, time });
+    });
+    const latest = [...newest].sort(([, a], [, b]) => b.time - a.time).slice(0, HISTORY_LIMIT);
+    const known = await lookUp(latest.map(([id]) => id));
+
+    const { series = {} } = GM_getValue('snapshot', {});
+    const now = Date.now();
+    const watching = read(HERMES_WATCHING);
+    const history = (watching.history ??= {});
+    const playback = read(HERMES_PLAYBACK);
+    let added = 0;
+    for (const [id, { episode, position, duration, time }] of latest) {
+      const found = known[id];
+      const s = series[id];
+      const at = Math.min(time, now);
+      const had = found && history[found.h];
+      if (!found || !s?.name || had?.lastViewed >= at) continue;
+      history[found.h] = {
+        ...had,
+        mediaId: found.m,
+        historyId: found.h,
+        title: s.name,
+        episodeNumber: episode,
+        externalIds: { ...had?.externalIds, anilist: [id] },
+        coverImage: s.cover ?? null,
+        bannerImage: s.banner ?? null,
+        totalEpisodes: s.episodes ?? null,
+        watchedEpisodes: [...new Set([...(had?.watchedEpisodes ?? []), episode])],
+        positionSeconds: position,
+        durationSeconds: duration,
+        lastViewed: at,
+      };
+      if (position > 0 && position < duration)
+        playback[`${found.h}:${episode}`] = {
+          currentTime: position,
+          duration,
+          playbackPercentage: (position / duration) * 100,
+          lastUpdated: at,
+        };
+      added = Math.max(added, at);
+    }
+
+    if (added) {
+      write(HERMES_WATCHING, watching);
+      write(HERMES_PLAYBACK, playback);
+    }
+    const marks = read(MARKS);
+    write(MARKS, { ...marks, hermes: top, exported: Math.max(marks.exported ?? now, added) });
+    if (added) dispatchEvent(new Event('focus'));
+  };
+
+  let importing = null;
+  const importHermes = () => {
+    if (!HERMES_APP) return undefined;
+    importing ??= applyHermes()
+      .catch((err) => console.debug('ws sync:', err.message))
+      .finally(() => {
+        importing = null;
+      });
+    return importing;
   };
 
   const LAYOUT = `
@@ -347,7 +472,7 @@
     title: 'ws.ryuo.to sync',
     close: '\u2715',
     other: [SITE, 'Open ws.ryuo.to'],
-    link: (id, s) => `/search?query=${encodeURIComponent(s.name)}`,
+    link: (id, s) => `/search?${HERMES_APP ? 'q' : 'query'}=${encodeURIComponent(s.name)}`,
     copied: (when) => `Copied from your account ${when}.`,
     never: 'Nothing copied yet. Open ws.ryuo.to while signed in.',
     waiting: (n) => `${n} ${n === 1 ? 'update' : 'updates'} will be sent to your account next time you open ws.ryuo.to.`,
@@ -541,8 +666,12 @@
   } else {
     GM_setValue('miruro', location.origin);
     scan();
-    const current = apply();
-    setInterval(scan, CHECK_EVERY);
+    const current = HERMES_APP || apply();
+    importHermes();
+    setInterval(() => {
+      scan();
+      return importHermes();
+    }, CHECK_EVERY);
     addEventListener('pagehide', scan);
     if (document.readyState === 'loading')
       document.addEventListener('DOMContentLoaded', () => mount(current));
